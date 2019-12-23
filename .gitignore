@@ -18,7 +18,9 @@ node_modules
 .env
 
 # scripts and artifacts for dev testing
-dev
+.dev
+# direnv
+.envrc
 
 # vim stuff
 **/*.sw[nop]

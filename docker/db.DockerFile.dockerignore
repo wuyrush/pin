@@ -1,0 +1,5 @@
+# component-specific .dockerignore file
+# https://stackoverflow.com/a/57774684
+
+**/*
+!config/db/*
