@@ -1,6 +1,6 @@
 # pin
 
-`pin` is a micro web service for users to save and share information(primarily text) in limited time period.
+`pin` makes saving and sharing information(primarily text) in limited time easy.
 
 ## Requirements:
 

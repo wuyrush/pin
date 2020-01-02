@@ -1,4 +1,5 @@
 # component-specific .dockerignore file
+# https://github.com/moby/moby/issues/12886
 # https://stackoverflow.com/a/57774684
 
 **/*

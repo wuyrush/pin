@@ -3,5 +3,6 @@
 
 CREATE TABLE IF NOT EXISTS info (
     id varchar(64),
+    expiry bigint,  -- unix epoch timestamp for periodical db cleanup
     body text
 )
