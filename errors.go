@@ -16,7 +16,7 @@ type pinErr struct {
 }
 
 func (e *pinErr) Error() string {
-	return msg
+	return e.msg
 }
 
 func (e *pinErr) Unwrap() error {

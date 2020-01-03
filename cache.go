@@ -30,7 +30,7 @@ type pinRedis struct {
 }
 
 func (r *pinRedis) PutMetadata(m *metadata) error {
-	cl := log.WithFields(log.Fields{"id": m.id, "expiry": m.Expiry})
+	cl := log.WithFields(log.Fields{"id": m.ID, "expiry": m.Expiry})
 	_, err := r.db.HMSet(m.ID, map[string]interface{}{
 		fieldNameOwnerID:  m.OwnerID,
 		fieldNameType:     m.Type,
@@ -41,7 +41,7 @@ func (r *pinRedis) PutMetadata(m *metadata) error {
 	}).Result()
 	if err != nil {
 		cl.WithError(err).Error("failed saving metadata")
-		return errServiceFailure("failed saving metadata").WithCaus(err)
+		return errServiceFailure("failed saving metadata").WithCause(err)
 	}
 	// set expiry. TODO: janitor mechanism to cleanup possible leaked metadata
 	_, err = r.db.ExpireAt(m.ID, m.Expiry).Result()

@@ -6,4 +6,5 @@ require (
 	github.com/go-pg/pg/v9 v9.1.0
 	github.com/go-redis/redis v6.15.6+incompatible
 	github.com/sirupsen/logrus v1.4.2
+	github.com/spf13/viper v1.6.1
 )
