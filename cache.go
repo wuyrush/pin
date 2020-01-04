@@ -9,12 +9,12 @@ import (
 )
 
 const (
-	fieldNameOwnerID  = "ownerId"
-	fieldNameType     = "type"
-	fieldNameMode     = "mode"
-	fieldViewCount    = "viewCount"
-	fieldMaxViewCount = "maxViewCount"
-	fieldNameExpiry   = "expiry"
+	fieldNameOwnerID      = "ownerId"
+	fieldNameType         = "type"
+	fieldNameMode         = "mode"
+	fieldNameViewCount    = "viewCount"
+	fieldNameMaxViewCount = "maxViewCount"
+	fieldNameExpiry       = "expiry"
 )
 
 // Interface of all caches used in the application.
@@ -22,6 +22,7 @@ const (
 type pinCache interface {
 	PutMetadata(*metadata) error
 	GetMetadata(id string) (*metadata, error)
+	Close() error
 }
 
 // pinRedis implements pinCache interface driven by Redis
@@ -32,12 +33,12 @@ type pinRedis struct {
 func (r *pinRedis) PutMetadata(m *metadata) error {
 	cl := log.WithFields(log.Fields{"id": m.ID, "expiry": m.Expiry})
 	_, err := r.db.HMSet(m.ID, map[string]interface{}{
-		fieldNameOwnerID:  m.OwnerID,
-		fieldNameType:     m.Type,
-		fieldNameMode:     m.Mode,
-		fieldViewCount:    m.ViewCount,
-		fieldMaxViewCount: m.MaxViewCount,
-		fieldNameExpiry:   m.Expiry,
+		fieldNameOwnerID:      m.OwnerID,
+		fieldNameType:         m.Type,
+		fieldNameMode:         m.Mode,
+		fieldNameViewCount:    m.ViewCount,
+		filedNameMaxViewCount: m.MaxViewCount,
+		fieldNameExpiry:       m.Expiry,
 	}).Result()
 	if err != nil {
 		cl.WithError(err).Error("failed saving metadata")
@@ -54,12 +55,12 @@ func (r *pinRedis) PutMetadata(m *metadata) error {
 
 func (r *pinRedis) GetMetadata(id string) (*metadata, error) {
 	s, err := r.db.HMGet(id,
-		"fieldNameOwnerID",
-		"fieldNameType",
-		"fieldNameMode",
-		"fieldNameExpiry",
-		"fieldViewCount",
-		"fieldMaxViewCountwCount",
+		fieldNameOwnerID,
+		fieldNameType,
+		fieldNameMode,
+		fieldNameExpiry,
+		fieldNameViewCount,
+		filedNameMaxViewCountwCount,
 	).Result()
 	if err != nil {
 		if err == redis.Nil {
@@ -78,4 +79,11 @@ func (r *pinRedis) GetMetadata(id string) (*metadata, error) {
 		ViewCount:    s[4].(uint64),
 		MaxViewCount: s[5].(*uint64),
 	}, nil
+}
+
+func (r *pinRedis) Close() error {
+	if err := r.db.Close(); err != nil {
+		return errServiceFailure("failed close Redis client").WithCause(err)
+	}
+	return nil
 }

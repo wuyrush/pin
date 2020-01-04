@@ -11,6 +11,7 @@ type pinDB interface {
 	GetInfoText(string) (*info, error)
 	// get info in binary mode given its id
 	GetInfoBinary(string) (*info, error)
+	Close() error
 }
 
 // pgr implements pinDB interface driven by PostgreSQL
@@ -30,4 +31,11 @@ func (p *pgr) GetInfoText(id string) (*info, error) {
 // pgr is only used to store info in text mode
 func (p *pgr) GetInfoBinary(id string) (*info, error) {
 	return nil, errNotImplemented()
+}
+
+func (p *pgr) Close() error {
+	if err := p.db.Close(); err != nil {
+		return errServiceFailure("failed to close DB resources").WithCause(err)
+	}
+	return nil
 }
