@@ -1,14 +1,10 @@
 FROM postgres:alpine
+# NOTE: NEVER persist the db username and password as env vars during image build time, since an attacker can easily dump the
+# content of intermediate image layers and find out such info
+# https://docs.docker.com/develop/develop-images/dockerfile_best-practices/#env
+# Instead, pass them as env var when starting up the db container
 
-# persist environment variables for DB setup
-ARG DB_NAME 
-ENV POSTGRES_DB DB_NAME
-ARG DB_USER 
-ENV POSTGRES_USER DB_USER
-ARG DB_PASSWD
-ENV POSTGRES_PASSWORD DB_PASSWD
-
-# setup db infra during image build time
+# setup application's db layer during image build time
 # https://github.com/docker-library/postgres/blob/master/docker-entrypoint.sh#L255-L276
 # https://stackoverflow.com/a/38714511
 ADD ./config/db/* /docker-entrypoint-initdb.d/

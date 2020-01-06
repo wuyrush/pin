@@ -1,5 +1,10 @@
 package main
 
+import (
+	"errors"
+	"strings"
+)
+
 type errCode string
 
 const (
@@ -15,8 +20,17 @@ type pinErr struct {
 	cause    error
 }
 
+// prefer stacktrace due to prevalence of nested errors
 func (e *pinErr) Error() string {
-	return e.msg
+	b := &strings.Builder{}
+	b.WriteString(e.msg)
+	err := errors.Unwrap(e)
+	for err != nil {
+		b.WriteString("\nCaused by: ")
+		b.WriteString(err.Error())
+		err = errors.Unwrap(err)
+	}
+	return b.String()
 }
 
 func (e *pinErr) Unwrap() error {

@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/go-pg/pg"
+	"github.com/go-pg/pg/v9"
 	"github.com/go-redis/redis"
 	"github.com/julienschmidt/httprouter"
 	log "github.com/sirupsen/logrus"
@@ -20,6 +20,8 @@ const (
 	envRedisPort   = "REDIS_PORT"
 	envRedisPasswd = "REDIS_PASSWD"
 	envRedisDB     = "REDIS_DB"
+	envDBHost      = "DB_HOST"
+	envDBPort      = "DB_PORT"
 	envDBUser      = "DB_USER"
 	envDBPasswd    = "DB_PASSWD"
 	envDBName      = "DB_NAME"
@@ -45,14 +47,16 @@ func newPinServer(opts ...pinServerOption) *pinServer {
 	return s
 }
 
-// start up application sever and serve incoming requests
+// start up application server and serve incoming requests
 func serve() error {
 	// read configuration from env vars
-	viper.SetEnvPrefix(envVarPrefix)
 	viper.AutomaticEnv()
 
 	setupLog()
 	// initialize dependencies in data layer
+	// TODO: add retry with tight timeout to poll the status of dependencies till they are ready or we timeout
+	// NOTE docker compose's depends_on feature only guarantee the startup order of service containers,
+	// it is us who define when a service becomes ready
 	metadataCache, err := setupMetadataCache()
 	if err != nil {
 		return err
@@ -109,6 +113,7 @@ func setupMetadataCache() (pinCache, error) {
 
 func setupDB() (pinDB, error) {
 	db := pg.Connect(&pg.Options{
+		Addr:     fmt.Sprintf("%s:%s", viper.GetString(envDBHost), viper.GetString(envDBPort)),
 		User:     viper.GetString(envDBUser),
 		Password: viper.GetString(envDBPasswd),
 		Database: viper.GetString(envDBName),

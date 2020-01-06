@@ -37,7 +37,7 @@ func (r *pinRedis) PutMetadata(m *metadata) error {
 		fieldNameType:         m.Type,
 		fieldNameMode:         m.Mode,
 		fieldNameViewCount:    m.ViewCount,
-		filedNameMaxViewCount: m.MaxViewCount,
+		fieldNameMaxViewCount: m.MaxViewCount,
 		fieldNameExpiry:       m.Expiry,
 	}).Result()
 	if err != nil {
@@ -60,7 +60,7 @@ func (r *pinRedis) GetMetadata(id string) (*metadata, error) {
 		fieldNameMode,
 		fieldNameExpiry,
 		fieldNameViewCount,
-		filedNameMaxViewCountwCount,
+		fieldNameMaxViewCount,
 	).Result()
 	if err != nil {
 		if err == redis.Nil {
