@@ -6,6 +6,8 @@ FROM golang:alpine as builder
 
 WORKDIR /build
 
+ENV GOPROXY https://goproxy.io 
+
 ADD . .
 
 RUN GOOS=linux go build -v -o ./pin-server .
@@ -15,6 +17,8 @@ FROM alpine:latest as deployer
 WORKDIR /pin
 
 COPY --from=builder /build/pin-server .
+
+ADD ./templates ./templates
 
 ENV PATH /pin:$PATH
 

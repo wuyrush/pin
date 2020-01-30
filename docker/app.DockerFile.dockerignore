@@ -7,3 +7,6 @@
 !go.*
 # include all go sources
 !**/*.go
+
+# include all html templates
+!templates

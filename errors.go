@@ -11,17 +11,21 @@ const (
 	errCodeNotImplemented errCode = "NotImplemented"
 	errCodeNotFound       errCode = "NotFound"
 	errCodeServiceFailure errCode = "ServiceFailure"
+	errCodeAPIBadRequest  errCode = "BadRequest"
 )
 
 type pinErr struct {
-	code     errCode
-	msg      string
-	onClient bool
-	cause    error
+	Code  errCode
+	msg   string
+	cause error
 }
 
-// prefer stacktrace due to prevalence of nested errors
 func (e *pinErr) Error() string {
+	return e.msg
+}
+
+// Trace returns the stacktrace associated with the error
+func (e *pinErr) Trace() string {
 	b := &strings.Builder{}
 	b.WriteString(e.msg)
 	err := errors.Unwrap(e)
@@ -41,12 +45,6 @@ func newPinErr(m string) *pinErr {
 	return &pinErr{msg: m}
 }
 
-// prefer incremental building the error up than explicit instantiation via pointer(e := &pinErr{...})
-func (e *pinErr) WithOnClient(b bool) *pinErr {
-	e.onClient = b
-	return e
-}
-
 func (e *pinErr) WithCause(c error) *pinErr {
 	e.cause = c
 	return e
@@ -57,20 +55,27 @@ func (e *pinErr) WithCause(c error) *pinErr {
 // WithCause() to be explicit
 func errServiceFailure(m string) *pinErr {
 	return &pinErr{
-		code: errCodeServiceFailure,
+		Code: errCodeServiceFailure,
 		msg:  m,
 	}
 }
 func errNotFound(m string) *pinErr {
 	return &pinErr{
-		code: errCodeNotFound,
+		Code: errCodeNotFound,
+		msg:  m,
+	}
+}
+
+func errBadRequest(m string) *pinErr {
+	return &pinErr{
+		Code: errCodeAPIBadRequest,
 		msg:  m,
 	}
 }
 
 func errNotImplemented() *pinErr {
 	return &pinErr{
-		code: errCodeNotImplemented,
+		Code: errCodeNotImplemented,
 		msg:  "Not implemented",
 	}
 }

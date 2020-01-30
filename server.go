@@ -4,8 +4,9 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strings"
+	"time"
 
-	"github.com/go-pg/pg/v9"
 	"github.com/go-redis/redis"
 	"github.com/julienschmidt/httprouter"
 	log "github.com/sirupsen/logrus"
@@ -20,31 +21,22 @@ const (
 	envRedisPort   = "REDIS_PORT"
 	envRedisPasswd = "REDIS_PASSWD"
 	envRedisDB     = "REDIS_DB"
-	envDBHost      = "DB_HOST"
-	envDBPort      = "DB_PORT"
-	envDBUser      = "DB_USER"
-	envDBPasswd    = "DB_PASSWD"
-	envDBName      = "DB_NAME"
+
+	envReqBodySizeMaxByte       = "PIN_REQ_BODY_SIZE_MAX_BYTE"
+	envPinTitleSizeMaxByte      = "PIN_TITLE_SIZE_MAX_BYTE"
+	envPinNoteSizeMaxByte       = "PIN_NOTE_SIZE_MAX_BYTE"
+	envPinAttachmentSizeMaxByte = "PIN_ATTACHMENT_SIZE_MAX_BYTE"
+	envPinAttachmentCntMax      = "PIN_ATTACHMENT_COUNT_MAX"
 )
 
 type pinServer struct {
-	metadataCache pinCache
-	db            pinDB
-	router        *httprouter.Router
+	PS     pinStore
+	FS     fileStore
+	Router *httprouter.Router
 }
 
 func (s *pinServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	s.router.ServeHTTP(w, r)
-}
-
-type pinServerOption func(*pinServer)
-
-func newPinServer(opts ...pinServerOption) *pinServer {
-	s := &pinServer{}
-	for _, opt := range opts {
-		opt(s)
-	}
-	return s
+	s.Router.ServeHTTP(w, r)
 }
 
 // start up application server and serve incoming requests
@@ -54,27 +46,23 @@ func serve() error {
 
 	setupLog()
 	// initialize dependencies in data layer
-	// TODO: add retry with tight timeout to poll the status of dependencies till they are ready or we timeout
-	// NOTE docker compose's depends_on feature only guarantee the startup order of service containers,
-	// it is us who define when a service becomes ready
-	metadataCache, err := setupMetadataCache()
+	// NOTE docker compose's depends_on feature only guarantee the startup order of *service containers*,
+	// instead of the services themselves - It is us who define when the services are ready
+	ps, err := setupPinStore()
 	if err != nil {
 		return err
 	}
-	defer metadataCache.Close()
-	db, err := setupDB()
+	defer ps.Close()
+	fs, err := setupFileStore()
 	if err != nil {
 		return err
 	}
-	defer db.Close()
+	defer fs.Close()
 
-	svr := newPinServer(
-		func(s *pinServer) {
-			s.metadataCache = metadataCache
-			s.db = db
-		},
-		setupMux(),
-	)
+	svr := &pinServer{}
+	svr.PS = ps
+	svr.FS = fs
+	svr.SetupMux()
 
 	host, port := viper.GetString(envAppHost), viper.GetString(envAppPort)
 	log.WithFields(log.Fields{
@@ -98,50 +86,37 @@ func setupLog() {
 	}
 }
 
-func setupMetadataCache() (pinCache, error) {
+func setupPinStore() (pinStore, error) {
+	retryOpts := []retryOption{
+		withTimeout(3 * time.Second),
+		withBaseDelay(100 * time.Millisecond),
+		withExp(2.0),
+		withRetryOn(isDepOffline),
+	}
 	redisClient := redis.NewClient(&redis.Options{
-		Addr:     fmt.Sprintf("%s:%s", viper.GetString(envRedisHost), viper.GetString(envRedisPort)),
-		Password: viper.GetString(envRedisPasswd),
-		DB:       viper.GetInt(envRedisDB),
+		Addr:       fmt.Sprintf("%s:%s", viper.GetString(envRedisHost), viper.GetString(envRedisPort)),
+		Password:   viper.GetString(envRedisPasswd),
+		DB:         viper.GetInt(envRedisDB),
+		MaxRetries: 3,
 	})
 	// verify the client is up correctly
-	if _, err := redisClient.Ping().Result(); err != nil {
+	pingFn := func() error {
+		_, err := redisClient.Ping().Result()
+		return err
+	}
+	if err := retry(pingFn, retryOpts...); err != nil {
 		return nil, errServiceFailure("failed initializing Redis").WithCause(err)
 	}
-	return &pinRedis{redisClient}, nil
+	return &redisStore{DB: redisClient}, nil
 }
 
-func setupDB() (pinDB, error) {
-	db := pg.Connect(&pg.Options{
-		Addr:     fmt.Sprintf("%s:%s", viper.GetString(envDBHost), viper.GetString(envDBPort)),
-		User:     viper.GetString(envDBUser),
-		Password: viper.GetString(envDBPasswd),
-		Database: viper.GetString(envDBName),
-	})
-	// verify the connection is up correctly
-	// https://github.com/go-pg/pg/wiki/FAQ#how-to-check-connection-health
-	// TODO: test out what the query does and see if there is any performance impact
-	if _, err := db.Exec("SELECT 1"); err != nil {
-		return nil, errServiceFailure("failed initializing Postgres DB").WithCause(err)
-	}
-	return &pgr{db}, nil
+func setupFileStore() (fileStore, error) {
+	return &localFileStore{}, nil
 }
 
-// set up routes
-func setupMux() pinServerOption {
-	return func(s *pinServer) {
-		r := httprouter.New()
-		r.GET("/pin/:id", s.HandleTaskGetPin())
-
-		s.router = r
+func isDepOffline(e error) bool {
+	if e != nil && strings.Index(e.Error(), "connect: connection refused") >= 0 {
+		return true
 	}
-}
-
-// --------------- Handles ---------------
-
-func (s *pinServer) HandleTaskGetPin() httprouter.Handle {
-	// TODO: implement
-	return func(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-		fmt.Fprintf(w, "visiting pin with id %s", ps.ByName("id"))
-	}
+	return false
 }

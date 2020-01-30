@@ -1,0 +1,20 @@
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Pin: {{.Title}}</title>
+</head>
+<body>
+  <p class="pin-title">{{.Title}}</p>
+  <br>
+  <p class="pin-note">{{.Note}}</p>
+  <br>
+  {{if .Attachments}}
+  Attachments:<br>
+  <ul>
+    {{range $filename, $url := .FilenameToURL}}
+    <li><a href={{$url}}>{{$filename}}</a></li>
+    {{end}}
+  </ul>
+  {{end}}
+</body>
+</html>

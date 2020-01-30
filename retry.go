@@ -13,7 +13,7 @@ import (
 	- max timeout
 
 	Retries up to either MaxAttempts or till Timeout or RetryOn returns false. The time interval between the i-th and (i+1)-th
-	attempt is `BaseDelay * ( Exp ^ ( i+1 ) + Jitter )`
+	attempt is `min( BaseDelay * ( Exp ^ ( i+1 ) + Jitter ), MaxBackoff )`
 */
 
 // fn is the function to retry
@@ -23,8 +23,9 @@ type fn func() error
 type retryOnFn func(error) bool
 
 type retryConfig struct {
-	MaxAttempts int
-	Timeout     time.Duration
+	MaxAttempts int64
+	MaxBackoff  time.Duration // maximum wait time before next attempt, non-negative value means no wait
+	Timeout     time.Duration // non-negative value means timeout immediately
 	Jitter      float64
 	BaseDelay   time.Duration
 	Exp         float64
@@ -35,12 +36,15 @@ type retryOption func(*retryConfig)
 
 func defaultRetryConfig() *retryConfig {
 	return &retryConfig{
-		Exp:     1,
-		RetryOn: func(error) bool { return false },
+		MaxAttempts: math.MaxInt64,
+		MaxBackoff:  time.Duration(math.MaxInt64),
+		Timeout:     time.Duration(math.MaxInt64),
+		Exp:         1,
+		RetryOn:     func(error) bool { return false },
 	}
 }
 
-func withMaxAttempts(a int) retryOption {
+func withMaxAttempts(a int64) retryOption {
 	return func(c *retryConfig) {
 		c.MaxAttempts = a
 	}
@@ -76,6 +80,12 @@ func withRetryOn(f retryOnFn) retryOption {
 	}
 }
 
+func withMaxBackoff(b time.Duration) retryOption {
+	return func(c *retryConfig) {
+		c.MaxBackoff = b
+	}
+}
+
 func retry(f fn, opts ...retryOption) error {
 	cfg := defaultRetryConfig()
 	for _, opt := range opts {
@@ -94,10 +104,14 @@ func retry(f fn, opts ...retryOption) error {
 		defer t.Stop()
 		timeout = t.C
 	}
-	for i := 1; i <= cfg.MaxAttempts; i++ {
+	var i int64
+	for ; i <= cfg.MaxAttempts; i++ {
 		factor := math.Pow(cfg.Exp, float64(i)) + cfg.Jitter
 		// cap the delay to the max of time.Duration, which is ~290 years
 		delay := time.Duration(math.Min(float64(cfg.BaseDelay.Nanoseconds())*factor, math.MaxInt64)) * time.Nanosecond
+		if delay > cfg.MaxBackoff {
+			delay = cfg.MaxBackoff
+		}
 		t := time.NewTimer(delay)
 		defer t.Stop()
 		select {

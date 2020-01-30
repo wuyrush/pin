@@ -6,21 +6,20 @@ services:
             context: ..
             dockerfile: ./docker/app.DockerFile # NOTE relative to the context root
         depends_on: # NOTE only guarantee startup and termination order on container level, not on service level
-            - db
             - redis
         environment:
             - PIN_VERBOSE
             - PIN_HOST
             - PIN_PORT
+            - PIN_REQ_BODY_SIZE_MAX_BYTE
+            - PIN_TITLE_SIZE_MAX_BYTE
+            - PIN_NOTE_SIZE_MAX_BYTE
+            - PIN_ATTACHMENT_SIZE_MAX_BYTE
+            - PIN_ATTACHMENT_COUNT_MAX
             - REDIS_HOST
             - REDIS_PORT
             - REDIS_PASSWD
             - REDIS_DB
-            - DB_HOST
-            - DB_PORT
-            - DB_USER
-            - DB_PASSWD
-            - DB_NAME
         networks:
             - pin-network
         # only expose frontend to outside world
@@ -46,25 +45,7 @@ services:
             - "--maxclients ${REDIS_MAX_CLIENTS}"
             - "--maxmemory ${REDIS_MAXMEM_BYTES}"
             - "--maxmemory-policy ${REDIS_MAXMEM_POLICY}"
-    db:
-        build:
-            context: ..
-            dockerfile: ./docker/db.DockerFile
-        environment:
-            # https://github.com/docker-library/postgres/blob/master/docker-entrypoint.sh#L218
-            PGPORT: "${DB_PORT}"
-            POSTGRES_DB: "${DB_NAME}" 
-            POSTGRES_USER: "${DB_USER}" 
-            POSTGRES_PASSWORD: "${DB_PASSWD}" 
-        volumes:
-            # https://github.com/docker-library/postgres/blob/0d0485cb02e526f5a240b7740b46c35404aaf13f/12/alpine/Dockerfile
-            - pin-db-data:/var/lib/postgresql/data
-        networks:
-            - pin-network
-        expose:
-            - "${DB_PORT}"
 networks:
     pin-network:
 volumes:
     pin-cache-data:
-    pin-db-data:
