@@ -5,8 +5,9 @@ import "github.com/julienschmidt/httprouter"
 // set up routes
 func (s *pinServer) SetupMux() {
 	r := httprouter.New()
-	r.GET("/", s.HandleTaskCreatePin())
-	r.GET("/pin", s.HandleTaskCreatePin())
+	r.GET("/", s.HandleTaskGetCreatePinPage())
+	r.GET("/pin", s.HandleTaskGetCreatePinPage())
+	r.POST("/", s.HandleTaskCreatePin())
 	r.POST("/pin", s.HandleTaskCreatePin())
 	r.GET("/pin/:id", s.HandleTaskGetPin())
 	r.GET("/pins/anonymous", s.HandleTaskListAnonymousPins())

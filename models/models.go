@@ -1,4 +1,4 @@
-package main
+package models
 
 import (
 	"time"
@@ -8,30 +8,30 @@ import (
  Application layer data models.
 */
 
-type user struct {
+type User struct {
 	ID string
 }
 
-func (u *user) Anonymous() bool {
+func (u *User) Anonymous() bool {
 	return u == nil
 }
 
-type accessMode int
+type AccessMode int
 
 const (
-	accessModePublic accessMode = iota
-	accessModePrivate
+	AccessModePublic AccessMode = iota
+	AccessModePrivate
 )
 
-var accessModeVals = map[accessMode]struct{}{
-	accessModePublic:  {},
-	accessModePrivate: {},
+var AccessModeVals = map[AccessMode]struct{}{
+	AccessModePublic:  {},
+	AccessModePrivate: {},
 }
 
-type pin struct {
+type Pin struct {
 	ID           string
 	OwnerID      string
-	Mode         accessMode
+	Mode         AccessMode
 	CreationTime time.Time
 	GoodFor      time.Duration
 	ReadAndBurn  bool
@@ -43,7 +43,7 @@ type pin struct {
 	Attachments map[string]string
 }
 
-func (p *pin) VisibleTo(u *user) bool {
+func (p *Pin) VisibleTo(u *User) bool {
 	// TODO: implement
 	return false
 }
@@ -52,19 +52,21 @@ func (p *pin) VisibleTo(u *user) bool {
 // 1. The current server time is later than the pin info's expiry OR
 // 2. The pin info has ReadAndBurn marked as true and ViewCount >= 1
 // The application shall remove all expired pin info from cache to prevent any further access.
-func (p *pin) Expired() bool {
+func (p *Pin) Expired() bool {
 	return time.Now().After(p.CreationTime.Add(p.GoodFor)) || (p.ReadAndBurn && p.ViewCount >= 1)
 }
 
-/*
-{
-	pinID: {
-		metadata: {
-
-		},
-		content: {
-
-		}
-	}
+// pinView vends necessary pin data for rendering web pages
+type PinView struct {
+	Pin
+	Expiry        time.Time
+	Err           string
+	URL           string
+	FilenameToURL map[string]string
 }
-*/
+
+// Junk represents necessary pin data for deletion purpose
+type Junk struct {
+	PinID    string   // pin ID
+	FileRefs []string // references of pin's attachments on storage layer
+}

@@ -4,6 +4,12 @@
   <title>Pin: {{.Title}}</title>
 </head>
 <body>
+  {{if .Err}}
+  <p class="pin-error">{{.Err}}</p>
+  {{else}}
+  <p class="pin-url">Pin URL: <a href="{{.URL}}">{{.URL}}</a></p>
+  {{/* TODO: add a copy-to-clipboard button */}}
+  {{end}}
   <p class="pin-title">{{.Title}}</p>
   <br>
   <p class="pin-note">{{.Note}}</p>

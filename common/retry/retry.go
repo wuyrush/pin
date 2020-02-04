@@ -1,7 +1,8 @@
-package main
+package retry
 
 import (
 	"math"
+	"strings"
 	"time"
 )
 
@@ -16,26 +17,26 @@ import (
 	attempt is `min( BaseDelay * ( Exp ^ ( i+1 ) + Jitter ), MaxBackoff )`
 */
 
-// fn is the function to retry
-type fn func() error
+// Fn is the function to apply retry strategies on
+type Fn func() error
 
-// retryOnFn decides whether to retry on given error
-type retryOnFn func(error) bool
+// RetryOnFn decides whether to retry on given error
+type RetryOnFn func(error) bool
 
-type retryConfig struct {
+type RetryConfig struct {
 	MaxAttempts int64
 	MaxBackoff  time.Duration // maximum wait time before next attempt, non-negative value means no wait
 	Timeout     time.Duration // non-negative value means timeout immediately
 	Jitter      float64
 	BaseDelay   time.Duration
 	Exp         float64
-	RetryOn     retryOnFn
+	RetryOn     RetryOnFn
 }
 
-type retryOption func(*retryConfig)
+type RetryOption func(*RetryConfig)
 
-func defaultRetryConfig() *retryConfig {
-	return &retryConfig{
+func defaultRetryConfig() *RetryConfig {
+	return &RetryConfig{
 		MaxAttempts: math.MaxInt64,
 		MaxBackoff:  time.Duration(math.MaxInt64),
 		Timeout:     time.Duration(math.MaxInt64),
@@ -44,49 +45,49 @@ func defaultRetryConfig() *retryConfig {
 	}
 }
 
-func withMaxAttempts(a int64) retryOption {
-	return func(c *retryConfig) {
+func WithMaxAttempts(a int64) RetryOption {
+	return func(c *RetryConfig) {
 		c.MaxAttempts = a
 	}
 }
 
-func withTimeout(t time.Duration) retryOption {
-	return func(c *retryConfig) {
+func WithTimeout(t time.Duration) RetryOption {
+	return func(c *RetryConfig) {
 		c.Timeout = t
 	}
 }
 
-func withJitter(j float64) retryOption {
-	return func(c *retryConfig) {
+func WithJitter(j float64) RetryOption {
+	return func(c *RetryConfig) {
 		c.Jitter = j
 	}
 }
 
-func withBaseDelay(t time.Duration) retryOption {
-	return func(c *retryConfig) {
+func WithBaseDelay(t time.Duration) RetryOption {
+	return func(c *RetryConfig) {
 		c.BaseDelay = t
 	}
 }
 
-func withExp(e float64) retryOption {
-	return func(c *retryConfig) {
+func WithExp(e float64) RetryOption {
+	return func(c *RetryConfig) {
 		c.Exp = e
 	}
 }
 
-func withRetryOn(f retryOnFn) retryOption {
-	return func(c *retryConfig) {
+func WithRetryOn(f RetryOnFn) RetryOption {
+	return func(c *RetryConfig) {
 		c.RetryOn = f
 	}
 }
 
-func withMaxBackoff(b time.Duration) retryOption {
-	return func(c *retryConfig) {
+func WithMaxBackoff(b time.Duration) RetryOption {
+	return func(c *RetryConfig) {
 		c.MaxBackoff = b
 	}
 }
 
-func retry(f fn, opts ...retryOption) error {
+func Retry(f Fn, opts ...RetryOption) error {
 	cfg := defaultRetryConfig()
 	for _, opt := range opts {
 		opt(cfg)
@@ -121,10 +122,15 @@ func retry(f fn, opts ...retryOption) error {
 				return err
 			}
 		case <-timeout:
-			return errRetryTimedOut
+			return ErrRetryTimedOut
 		}
 	}
 	return err
+}
+
+// ------------- helpers -------------
+func IsDepOffline(e error) bool {
+	return e != nil && strings.Index(e.Error(), "connect: connection refused") >= 0
 }
 
 type errRetry string
@@ -133,4 +139,4 @@ func (e errRetry) Error() string {
 	return string(e)
 }
 
-const errRetryTimedOut errRetry = "retry timed out"
+const ErrRetryTimedOut errRetry = "retry timed out"

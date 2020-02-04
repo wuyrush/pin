@@ -4,14 +4,17 @@
   <title>Pin it</title>
 </head>
 <body>
+  {{if .Err}}
+  <p class="pin-error">{{.Err}}</p>
+  {{end}}
   <h3>Create A Pin</h3>
 	<form action="/pin" method="POST" name="pin-form" enctype="multipart/form-data">
-		Title: <input type="text" name="title" value="" autofocus> <br>
+    Title: <input type="text" name="title" value="{{.Title}}" autofocus> <br>
 		Good for (golang-formatted time period): <input type="text" name="good-for" value=""> <br>
 		Private pin? <input type="checkbox" name="private" value="true"> <br>
 		Read-and-burn this pin? <input type="checkbox" name="read-and-burn" value="true"> <br>
 		Note:<br>
-		<textarea name="note" rows="5" cols="50"></textarea>
+    <textarea name="note" rows="5" cols="50">{{.Note}}</textarea>
 		<br>
 		Attachments:<br>
 		<input type="file" name="attachments" multiple><br><br>

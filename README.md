@@ -44,3 +44,10 @@
 
 The platform bears no liability to the information temporarily stored on `pin` and its consequence.
 
+## Entity Relationships
+
+TBD
+
+## Project Structure
+
+The project corresponds to a single Go module at project root, along with multiple packages and sub-packages.

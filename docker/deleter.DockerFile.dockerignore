@@ -1,0 +1,12 @@
+# component-specific .dockerignore file
+# https://github.com/moby/moby/issues/12886
+# https://stackoverflow.com/a/57774684
+
+**/*
+# include go module related files
+!go.*
+# include all go sources
+!**/*.go
+
+# include web service html templates
+!server/templates

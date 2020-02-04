@@ -1,32 +1,5 @@
 version: "3"
 services:
-    app:
-        build:
-            # paths are relative to the location of compose file
-            context: ..
-            dockerfile: ./docker/app.DockerFile # NOTE relative to the context root
-        depends_on: # NOTE only guarantee startup and termination order on container level, not on service level
-            - redis
-        environment:
-            - PIN_VERBOSE
-            - PIN_HOST
-            - PIN_PORT
-            - PIN_REQ_BODY_SIZE_MAX_BYTE
-            - PIN_TITLE_SIZE_MAX_BYTE
-            - PIN_NOTE_SIZE_MAX_BYTE
-            - PIN_ATTACHMENT_SIZE_MAX_BYTE
-            - PIN_ATTACHMENT_COUNT_MAX
-            - REDIS_HOST
-            - REDIS_PORT
-            - REDIS_PASSWD
-            - REDIS_DB
-        networks:
-            - pin-network
-        # only expose frontend to outside world
-        # https://docs.docker.com/compose/compose-file/#ports
-        # https://docs.docker.com/compose/compose-file/#expose
-        ports:
-            - "${PIN_HOST_PORT}:${PIN_PORT}"
     redis:
         image: redis:alpine
         volumes:
@@ -45,6 +18,53 @@ services:
             - "--maxclients ${REDIS_MAX_CLIENTS}"
             - "--maxmemory ${REDIS_MAXMEM_BYTES}"
             - "--maxmemory-policy ${REDIS_MAXMEM_POLICY}"
+    server:
+        build:
+            # paths are relative to the location of compose file
+            context: ..
+            dockerfile: ./docker/server.DockerFile # NOTE relative to the context root
+        depends_on: # NOTE only guarantee startup and termination order on container level, not on service level
+            - redis
+        environment:
+            - PIN_VERBOSE
+            - PIN_HOST
+            - PIN_PORT
+            - PIN_REQ_BODY_SIZE_MAX_BYTE
+            - PIN_TITLE_SIZE_MAX_BYTE
+            - PIN_NOTE_SIZE_MAX_BYTE
+            - PIN_ATTACHMENT_SIZE_MAX_BYTE
+            - PIN_ATTACHMENT_COUNT_MAX
+            - REDIS_HOST
+            - REDIS_PORT
+            - REDIS_PASSWD
+            - REDIS_DB
+        networks:
+            - pin-network
+        # NOTE only expose frontend service to outside world
+        # https://docs.docker.com/compose/compose-file/#ports
+        # https://docs.docker.com/compose/compose-file/#expose
+        ports:
+            - "${PIN_HOST_PORT}:${PIN_PORT}"
+    deleter:
+        build:
+            context: ..
+            dockerfile: ./docker/deleter.DockerFile
+        depends_on:
+            - redis
+        environment:
+            - PIN_VERBOSE
+            - REDIS_HOST
+            - REDIS_PORT
+            - REDIS_PASSWD
+            - REDIS_DB
+            - PIN_STORE_JUNK_FETCHER_POOL_SIZE
+            - PIN_DELETER_LOCAL_CACHE_SIZE
+            - PIN_DELETER_SWEEP_FREQ
+            - PIN_DELETER_MAX_SWEEP_LOAD
+            - PIN_DELETER_EXEC_POOL_SIZE
+            - PIN_DELETER_WIP_CACHE_ENTRY_EXPIRY
+        networks:
+            - pin-network
 networks:
     pin-network:
 volumes:

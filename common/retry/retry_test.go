@@ -1,4 +1,4 @@
-package main
+package retry
 
 import (
 	"fmt"
@@ -13,7 +13,6 @@ func (e testErrRetryable) Error() string {
 }
 
 func TestRetry(t *testing.T) {
-
 	retryable, nonRetryable := testErrRetryable{}, fmt.Errorf("non-retryable")
 	f := func(count *int, errs []error) error {
 		cnt := *count
@@ -28,7 +27,7 @@ func TestRetry(t *testing.T) {
 	tcs := []struct {
 		name     string
 		errs     []error
-		strategy []retryOption
+		strategy []RetryOption
 		expected int
 	}{
 		{
@@ -44,9 +43,9 @@ func TestRetry(t *testing.T) {
 				nonRetryable,
 			},
 			expected: 3,
-			strategy: []retryOption{
-				withMaxAttempts(2),
-				withRetryOn(retryOn),
+			strategy: []RetryOption{
+				WithMaxAttempts(2),
+				WithRetryOn(retryOn),
 			},
 		},
 		{
@@ -59,9 +58,9 @@ func TestRetry(t *testing.T) {
 				retryable,
 			},
 			expected: 3,
-			strategy: []retryOption{
-				withMaxAttempts(10),
-				withRetryOn(retryOn),
+			strategy: []RetryOption{
+				WithMaxAttempts(10),
+				WithRetryOn(retryOn),
 			},
 		},
 		// TODO: test timeout and exponential backoff
@@ -71,7 +70,7 @@ func TestRetry(t *testing.T) {
 		errs, strategy, exp := c.errs, c.strategy, c.expected
 		t.Run(c.name, func(*testing.T) {
 			actual := 0
-			retry(
+			Retry(
 				func() error {
 					// f can also return result besides values as long as we refer to
 					// the result with pointer so that it won't get lost
