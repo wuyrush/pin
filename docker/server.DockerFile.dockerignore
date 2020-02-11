@@ -8,5 +8,6 @@
 # include all go sources
 !**/*.go
 
-# include all html templates
-!templates
+# include all html templates and static assets
+!server/templates
+!server/static

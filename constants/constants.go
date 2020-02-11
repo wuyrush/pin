@@ -2,7 +2,7 @@
 package constants
 
 const (
-	// -------------- env vars --------------
+	// env vars ----------------------------------------------------
 	// common
 	EnvVerbose = "PIN_VERBOSE"
 	// stores
@@ -25,10 +25,10 @@ const (
 	EnvDeleterMaxSweepLoad        = "PIN_DELETER_MAX_SWEEP_LOAD"
 	EnvDeleterExecutorPoolSize    = "PIN_DELETER_EXEC_POOL_SIZE"
 	EnvDeleterWIPCacheEntryExpiry = "PIN_DELETER_WIP_CACHE_ENTRY_EXPIRY"
-
-	// -------------- error messages --------------
+	EnvSessAuthNKey               = "PIN_SESSION_AUTH_N_KEY"
+	EnvSessEncryptKey             = "PIN_SESSION_ENCRYPTION_KEY"
+	// error messages ----------------------------------------------------
 	ErrMsgRequestBodyTooLarge = "request body too large"
-
-	// -------------- error messages --------------
+	// logging ----------------------------------------------------
 	LogFieldFuncName = "funcName"
 )

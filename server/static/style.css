@@ -1,0 +1,8 @@
+/*
+ * As pe https://bit.ly/2w2ZI53 and https://css-tricks.com/places-its-tempting-to-use-display-none-but-dont/
+ */
+.mine {
+   position: absolute !important;
+   top: -9900px !important;
+   left: -9900px !important;
+}

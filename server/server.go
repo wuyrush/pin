@@ -6,12 +6,14 @@ import (
 	"time"
 
 	"github.com/go-redis/redis"
+	"github.com/gorilla/sessions"
 	"github.com/julienschmidt/httprouter"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"wuyrush.io/pin/common/logging"
 	rt "wuyrush.io/pin/common/retry"
 	cst "wuyrush.io/pin/constants"
+	"wuyrush.io/pin/email"
 	pe "wuyrush.io/pin/errors"
 	st "wuyrush.io/pin/stores"
 )
@@ -21,6 +23,8 @@ type pinServer struct {
 	PS     st.PinStore
 	FS     st.FileStore
 	Router *httprouter.Router
+	SS     sessions.Store
+	ML     *email.Mailer
 }
 
 func (s *pinServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -45,10 +49,14 @@ func serve() error {
 		return err
 	}
 	defer fs.Close()
-
+	ss, err := setupSessionStore()
+	if err != nil {
+		return err
+	}
+	ml := &email.Mailer{}
+	// TODO: close the session store when switch to Redis backend
 	svr := &pinServer{}
-	svr.PS = ps
-	svr.FS = fs
+	svr.PS, svr.FS, svr.SS, svr.ML = ps, fs, ss, ml
 	svr.SetupMux()
 
 	host, port := viper.GetString(cst.EnvAppHost), viper.GetString(cst.EnvAppPort)
@@ -86,4 +94,15 @@ func setupPinStore() (st.PinStore, error) {
 
 func setupFileStore() (st.FileStore, error) {
 	return &st.LocalFileStore{}, nil
+}
+
+// returns concrete type so that we can leverage its specific functionalities besides fulfilling interface
+// requirement in consumer(e.g., server only requires a sessions.Store, and we are able to close the store via
+// store's own Close() method)
+// TODO: replace CookieStore to homemade Redis-backed store
+func setupSessionStore() (*sessions.CookieStore, error) {
+	return sessions.NewCookieStore(
+		[]byte(viper.GetString(cst.EnvSessAuthNKey)),
+		[]byte(viper.GetString(cst.EnvSessEncryptKey)),
+	), nil
 }

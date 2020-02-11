@@ -1,6 +1,10 @@
 package main
 
-import "github.com/julienschmidt/httprouter"
+import (
+	"net/http"
+
+	"github.com/julienschmidt/httprouter"
+)
 
 // set up routes
 func (s *pinServer) SetupMux() {
@@ -21,5 +25,12 @@ func (s *pinServer) SetupMux() {
 	r.GET("/login", s.HandleAuthLogin())
 	r.POST("/login", s.HandleAuthLogin())
 	r.POST("/logout", s.HandleAuthLogout())
+	// static assets
+	r.Handler(
+		http.MethodGet,
+		"/static/*filepath",
+		http.StripPrefix("/static/", http.FileServer(http.Dir("static"))),
+	)
+
 	s.Router = r
 }

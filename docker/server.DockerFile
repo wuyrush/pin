@@ -8,6 +8,10 @@ WORKDIR /build
 # used when building Golang application images in region where google/golang.org sites are blocked, e.g., CHN
 ENV GOPROXY https://goproxy.io
 
+# warm the cache to speed up builds - (most) builds without adding new deps will benefit from this
+ADD ./go.mod ./go.sum /build/
+RUN GOOS=linux go mod download
+
 ADD . .
 
 RUN GOOS=linux go build -v -o ./pin-server wuyrush.io/pin/server
@@ -18,7 +22,8 @@ WORKDIR /pin
 
 COPY --from=builder /build/pin-server .
 
-ADD ./server/templates ./templates
+ADD ./server/templates ./templates/
+ADD ./server/static ./static/
 
 ENV PATH /pin:$PATH
 

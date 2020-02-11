@@ -28,10 +28,7 @@ const (
 
 func (s *pinServer) HandleTaskGetCreatePinPage() httprouter.Handle {
 	clog := logging.WithFuncName().WithField("httpMethod", http.MethodGet)
-	var (
-		tmpl     *template.Template
-		tmplPath = "templates/create_pin.html"
-	)
+	tmplPath := "templates/create_pin.html"
 	tmpl, err := template.ParseFiles(tmplPath)
 	if err != nil {
 		// fail early if err since this is critical path
@@ -52,19 +49,15 @@ func (s *pinServer) HandleTaskGetCreatePinPage() httprouter.Handle {
 */
 func (s *pinServer) HandleTaskCreatePin() httprouter.Handle {
 	clog := logging.WithFuncName().WithField("httpMethod", http.MethodPost)
-	var (
-		tmplCreatePin     *template.Template
-		tmplGetPin        *template.Template
-		tmplPathCreatePin = "templates/create_pin.html"
-		tmplPathGetPin    = "templates/get_pin.html"
-		maxReqBodySize    = viper.GetInt64(cst.EnvReqBodySizeMaxByte)
-	)
+	tmplPathCreatePin := "templates/create_pin.html"
+	tmplPathGetPin := "templates/get_pin.html"
+	maxReqBodySize := viper.GetInt64(cst.EnvReqBodySizeMaxByte)
 	// fail early if err since this is critical path
 	tmplCreatePin, err := template.ParseFiles(tmplPathCreatePin)
 	if err != nil {
 		clog.WithError(err).WithField("templatePath", tmplPathCreatePin).Fatal("html template not loaded")
 	}
-	tmplGetPin, err = template.ParseFiles(tmplPathGetPin)
+	tmplGetPin, err := template.ParseFiles(tmplPathGetPin)
 	if err != nil {
 		clog.WithError(err).WithField("templatePath", tmplPathGetPin).Fatal("html template not loaded")
 	}
@@ -188,10 +181,7 @@ func (s *pinServer) buildPin(r *http.Request) (*md.Pin, *pe.PinErr) {
 
 func (s *pinServer) HandleTaskGetPin() httprouter.Handle {
 	clog := logging.WithFuncName()
-	var (
-		tmpl     *template.Template
-		tmplPath = "templates/get_pin.html"
-	)
+	tmplPath := "templates/get_pin.html"
 	tmpl, err := template.ParseFiles(tmplPath)
 	if err != nil {
 		clog.WithError(err).WithField("templatePath", tmplPath).Fatal("html template not loaded")
@@ -300,9 +290,25 @@ func (s *pinServer) HandleTaskListUserPins() httprouter.Handle {
 }
 
 func (s *pinServer) HandleTaskRegister() httprouter.Handle {
-	// TODO: implement
+	clog := logging.WithFuncName()
+	tmplPath := "templates/register.html"
+	tmpl, err := template.ParseFiles(tmplPath)
+	if err != nil {
+		clog.WithError(err).WithField("templatePath", tmplPath).Fatal("html template not loaded")
+	}
+	type View struct {
+		Err   string
+		Email string
+	}
 	return func(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-
+		switch r.Method {
+		case http.MethodGet:
+			execTemplateLog(tmpl, w, View{}, clog.WithField("templatePath", tmplPath))
+		case http.MethodPost:
+			http.Error(w, "unsupported http method", http.StatusBadRequest)
+		default:
+			http.Error(w, "unsupported http method", http.StatusBadRequest)
+		}
 	}
 }
 
