@@ -11,6 +11,7 @@ const (
 	EnvRedisPasswd                 = "REDIS_PASSWD"
 	EnvRedisDB                     = "REDIS_DB"
 	EnvPinStoreJunkFetcherPoolSize = "PIN_STORE_JUNK_FETCHER_POOL_SIZE"
+	EnvUserPendingActivationFor    = "PIN_USER_PENDING_ACTIVATION_FOR"
 	// server
 	EnvAppHost                  = "PIN_HOST"
 	EnvAppPort                  = "PIN_PORT"
@@ -31,4 +32,16 @@ const (
 	ErrMsgRequestBodyTooLarge = "request body too large"
 	// logging ----------------------------------------------------
 	LogFieldFuncName = "funcName"
+	// server: web form field names
+	FormFieldNameMine   = "password"
+	FormFieldNameEmail  = "email"
+	FormFieldNamePasswd = "passwd"
+)
+
+// IDType represents the type of user ID
+type IDType string
+
+const (
+	IDTypeEmail       IDType = "email"
+	IDTypePhoneNumber IDType = "phoneNumber"
 )

@@ -38,6 +38,7 @@ services:
             - REDIS_PORT
             - REDIS_PASSWD
             - REDIS_DB
+            - PIN_USER_PENDING_ACTIVATION_FOR
         networks:
             - pin-network
         # NOTE only expose frontend service to outside world

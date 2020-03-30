@@ -2,19 +2,13 @@ package models
 
 import (
 	"time"
+
+	cst "wuyrush.io/pin/constants"
 )
 
 /*
  Application layer data models.
 */
-
-type User struct {
-	ID string
-}
-
-func (u *User) Anonymous() bool {
-	return u == nil
-}
 
 type AccessMode int
 
@@ -69,4 +63,18 @@ type PinView struct {
 type Junk struct {
 	PinID    string   // pin ID
 	FileRefs []string // references of pin's attachments on storage layer
+}
+
+// User models individual service user
+type User struct {
+	ID           string
+	IDType       cst.IDType
+	Passwd       string // only used during email / phone registration. Ignored in all other scenarios
+	Hash         string
+	CreationTime time.Time
+	Active       bool
+}
+
+func (u *User) Anonymous() bool {
+	return u == nil
 }

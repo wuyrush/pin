@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"html/template"
 	"io"
@@ -72,6 +73,7 @@ func (s *pinServer) HandleTaskCreatePin() httprouter.Handle {
 				code = http.StatusRequestEntityTooLarge
 			}
 			clog.WithError(err).Error(msg)
+			// TODO: direct user back to the CreatePin page so that she can retry
 			http.Error(w, msg, code)
 			return
 		}
@@ -305,7 +307,47 @@ func (s *pinServer) HandleTaskRegister() httprouter.Handle {
 		case http.MethodGet:
 			execTemplateLog(tmpl, w, View{}, clog.WithField("templatePath", tmplPath))
 		case http.MethodPost:
-			http.Error(w, "unsupported http method", http.StatusBadRequest)
+			if err := r.ParseForm(); err != nil {
+				clog.WithError(err).Error("error parsing POST form")
+				w.WriteHeader(http.StatusBadRequest)
+				execTemplateLog(tmpl, w, View{Err: "error parsing submitted form"}, clog.WithField("templatePath", tmplPath))
+				return
+			}
+			// filter out requests from bot
+			if r.Form.Get(cst.FormFieldNameMine) != "" {
+				// TODO: obtain client ip address and blacklist it for a given period in async
+				clog.WithField("clientAddress", r.RemoteAddr).Warn("bot detected")
+				http.Error(w, "Forbidden", http.StatusForbidden)
+				return
+			}
+			// verify email and password
+			emailAddr, passwd := r.Form.Get(cst.FormFieldNameEmail), r.Form.Get(cst.FormFieldNamePasswd)
+			if err := ValidateEmailAddr(emailAddr); err != nil {
+				w.WriteHeader(http.StatusBadRequest)
+				execTemplateLog(tmpl, w, View{Err: err.Error()}, clog.WithField("templatePath", tmplPath))
+				return
+			}
+			if err := ValidatePasswd(passwd); err != nil {
+				w.WriteHeader(http.StatusBadRequest)
+				execTemplateLog(tmpl, w, View{Err: err.Error(), Email: emailAddr}, clog.WithField("templatePath", tmplPath))
+				return
+			}
+			// TODO: create user account in DB but disable it. Expire it in X min unless activated
+			if err := s.US.Register(md.User{
+				IDType:       cst.IDTypeEmail,
+				ID:           emailAddr,
+				Passwd:       passwd,
+				CreationTime: time.Now(),
+			}); err != nil {
+				w.WriteHeader(err.StatusCode())
+				execTemplateLog(tmpl, w, View{Err: err.Error(), Email: emailAddr}, clog.WithField("templatePath", tmplPath))
+				return
+			}
+			// TODO: async tell a dedicated worker pool to:
+			// 1. Generate an activation link for the registered account
+			// 2. Mail the link  to the email associated with the account
+
+			http.Redirect(w, r, "/login", http.StatusMovedPermanently)
 		default:
 			http.Error(w, "unsupported http method", http.StatusBadRequest)
 		}
@@ -320,9 +362,21 @@ func (s *pinServer) HandleTaskGetUserProfile() httprouter.Handle {
 }
 
 func (s *pinServer) HandleAuthLogin() httprouter.Handle {
-	// TODO: implement
+	clog := logging.WithFuncName()
+	tmplPath := "templates/login.html"
+	tmpl, err := template.ParseFiles(tmplPath)
+	if err != nil {
+		clog.WithError(err).WithField("templatePath", tmplPath).Fatal("html template not loaded")
+	}
+	type View struct {
+		Err   string
+		Email string
+	}
 	return func(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-
+		switch r.Method {
+		case http.MethodGet:
+			execTemplateLog(tmpl, w, View{}, clog.WithField("templatePath", tmplPath))
+		}
 	}
 }
 
@@ -356,4 +410,17 @@ func execTemplateLog(t *template.Template, w io.Writer, data interface{}, log *l
 	if err := t.Execute(w, data); err != nil {
 		log.WithError(err).Error("error executing html template")
 	}
+}
+
+func ValidateEmailAddr(a string) error {
+	// TODO
+	if a == "" {
+		return errors.New("email address cannot be empty")
+	}
+	return nil
+}
+
+func ValidatePasswd(p string) error {
+	// TODO
+	return nil
 }

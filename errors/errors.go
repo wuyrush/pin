@@ -14,6 +14,7 @@ const (
 	ErrCodeServiceFailure    ErrCode = "ServiceFailure"
 	ErrCodeAPIBadRequest     ErrCode = "BadRequest"
 	ErrCodeDependencyFailure ErrCode = "DepedencyFailure"
+	ErrCodeExisted           ErrCode = "Existed"
 )
 
 type PinErr struct {
@@ -83,6 +84,13 @@ func ErrNotImplemented() *PinErr {
 	}
 }
 
+func ErrExisted(m string) *PinErr {
+	return &PinErr{
+		Code: ErrCodeExisted,
+		msg:  m,
+	}
+}
+
 // StatusCode returns the http response status code associated with the PinErr value
 func (e *PinErr) StatusCode() int {
 	switch e.Code {
@@ -90,6 +98,8 @@ func (e *PinErr) StatusCode() int {
 		return http.StatusNotFound
 	case ErrCodeAPIBadRequest:
 		return http.StatusBadRequest
+	case ErrCodeExisted:
+		return http.StatusForbidden
 	default:
 		return http.StatusInternalServerError
 	}

@@ -6,6 +6,6 @@ import (
 
 func main() {
 	if err := serve(); err != nil {
-		log.WithError(err).Fatal("Error start up server and serve requests")
+		log.WithError(err).Fatal("Error starting up server and serve requests")
 	}
 }

@@ -6,7 +6,7 @@ FROM golang:alpine as builder
 WORKDIR /build
 
 # used when building Golang application images in region where google/golang.org sites are blocked, e.g., CHN
-ENV GOPROXY https://goproxy.io
+# ENV GOPROXY https://goproxy.io
 
 # warm the cache to speed up builds - (most) builds without adding new deps will benefit from this
 ADD ./go.mod ./go.sum /build/

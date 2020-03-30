@@ -9,6 +9,8 @@
   {{end}}
   <h3>Create A Pin</h3>
 	<form action="/pin" method="POST" name="pin-form" enctype="multipart/form-data">
+    {{/* honeypot field to detect bots */}}
+    <input type="text" name="password" value="" class="mine" autocomplete="off">
     Title: <input type="text" name="title" value="{{.Title}}" autofocus> <br>
 		Good for (golang-formatted time period): <input type="text" name="good-for" value=""> <br>
 		Private pin? <input type="checkbox" name="private" value="true"> <br>

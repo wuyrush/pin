@@ -1,4 +1,4 @@
-package session
+package stores
 
 import (
 	"net/http"
@@ -20,14 +20,14 @@ While our current situation(as of 02/09/2020) is:
 So that if we have two devs then we can put one implement the auth workflow and the other implements the session store implementation. This is how we distribute work to the team - this is the basic skill for me to become a more mature engineer and team player
 */
 
-// Redistore is a github.com/gorilla/sessions.Store
+// RedisSessionStore is a github.com/gorilla/sessions.Store
 // TODO: implement
-type Redistore struct {
+type RedisSessionStore struct {
 	DB *redis.Client
 }
 
 // Get should return a cached session.
-func (s *Redistore) Get(r *http.Request, name string) (*sessions.Session, error) {
+func (s *RedisSessionStore) Get(r *http.Request, name string) (*sessions.Session, error) {
 	return nil, nil
 }
 
@@ -35,11 +35,11 @@ func (s *Redistore) Get(r *http.Request, name string) (*sessions.Session, error)
 //
 // Note that New should never return a nil session, even in the case of
 // an error if using the Registry infrastructure to cache the session.
-func (s *Redistore) New(r *http.Request, name string) (*sessions.Session, error) {
+func (s *RedisSessionStore) New(r *http.Request, name string) (*sessions.Session, error) {
 	return nil, nil
 }
 
 // Save should persist session to the underlying store implementation.
-func (s *Redistore) Save(r *http.Request, w http.ResponseWriter, sess *sessions.Session) error {
+func (s *RedisSessionStore) Save(r *http.Request, w http.ResponseWriter, sess *sessions.Session) error {
 	return nil
 }

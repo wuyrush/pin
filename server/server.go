@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
@@ -22,6 +23,7 @@ import (
 type pinServer struct {
 	PS     st.PinStore
 	FS     st.FileStore
+	US     st.UserStore
 	Router *httprouter.Router
 	SS     sessions.Store
 	ML     *email.Mailer
@@ -49,14 +51,24 @@ func serve() error {
 		return err
 	}
 	defer fs.Close()
+	us, err := setupUserStore()
+	if err != nil {
+		return err
+	}
+	defer us.Close()
 	ss, err := setupSessionStore()
 	if err != nil {
 		return err
 	}
 	ml := &email.Mailer{}
 	// TODO: close the session store when switch to Redis backend
-	svr := &pinServer{}
-	svr.PS, svr.FS, svr.SS, svr.ML = ps, fs, ss, ml
+	svr := &pinServer{
+		PS: ps,
+		FS: fs,
+		SS: ss,
+		US: us,
+		ML: ml,
+	}
 	svr.SetupMux()
 
 	host, port := viper.GetString(cst.EnvAppHost), viper.GetString(cst.EnvAppPort)
@@ -105,4 +117,35 @@ func setupSessionStore() (*sessions.CookieStore, error) {
 		[]byte(viper.GetString(cst.EnvSessAuthNKey)),
 		[]byte(viper.GetString(cst.EnvSessEncryptKey)),
 	), nil
+}
+
+func setupUserStore() (*st.RedisUserStore, error) {
+	userPendingActivateFor := viper.GetDuration(cst.EnvUserPendingActivationFor)
+	if userPendingActivateFor <= 0 {
+		return nil, errors.New("pending time for user activation must be larger than 0")
+	}
+	retryOpts := []rt.RetryOption{
+		rt.WithTimeout(3 * time.Second),
+		rt.WithBaseDelay(100 * time.Millisecond),
+		rt.WithExp(2.0),
+		rt.WithRetryOn(rt.IsDepOffline),
+	}
+	redisClient := redis.NewClient(&redis.Options{
+		Addr:       fmt.Sprintf("%s:%s", viper.GetString(cst.EnvRedisHost), viper.GetString(cst.EnvRedisPort)),
+		Password:   viper.GetString(cst.EnvRedisPasswd),
+		DB:         viper.GetInt(cst.EnvRedisDB),
+		MaxRetries: 3,
+	})
+	// verify the client is up correctly
+	pingFn := func() error {
+		_, err := redisClient.Ping().Result()
+		return err
+	}
+	if err := rt.Retry(pingFn, retryOpts...); err != nil {
+		return nil, pe.ErrServiceFailure("failed initializing Redis").WithCause(err)
+	}
+	return &st.RedisUserStore{
+		DB:                       redisClient,
+		UserPendingActivationFor: userPendingActivateFor,
+	}, nil
 }
