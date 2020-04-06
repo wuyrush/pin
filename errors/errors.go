@@ -17,6 +17,7 @@ const (
 	ErrCodeDependencyFailure ErrCode = "DepedencyFailure"
 	ErrCodeExisted           ErrCode = "Existed"
 	ErrCodeSpam              ErrCode = "SpamDetected"
+	ErrCodeOversized         ErrCode = "Oversized"
 )
 
 // Err models errors encountered by pin services
@@ -59,6 +60,11 @@ func (e *Err) WithCause(c error) *Err {
 	return e
 }
 
+func (e *Err) WithMsg(m string) *Err {
+	e.msg = m
+	return e
+}
+
 func NewServiceFailure(m string) *Err {
 	return &Err{
 		Code: ErrCodeServiceFailure,
@@ -95,10 +101,11 @@ func NewExisted(m string) *Err {
 }
 
 func NewSpam() *Err {
-	return &Err{
-		Code: ErrCodeSpam,
-		msg:  "",
-	}
+	return &Err{Code: ErrCodeSpam}
+}
+
+func NewOversized() *Err {
+	return &Err{Code: ErrCodeOversized}
 }
 
 // StatusCode returns the http response status code associated with the Err value
@@ -106,8 +113,10 @@ func (e *Err) StatusCode() int {
 	switch e.Code {
 	case ErrCodeNotFound:
 		return http.StatusNotFound
-	case ErrCodeAPIBadRequest:
+	case ErrCodeAPIBadRequest, ErrCodeOversized:
 		return http.StatusBadRequest
+	case ErrCodeSpam:
+		return http.StatusForbidden
 	default:
 		return http.StatusInternalServerError
 	}

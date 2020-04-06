@@ -2,10 +2,13 @@ package main
 
 import (
 	"bufio"
+	"fmt"
 	"html/template"
 	"io"
+	"io/ioutil"
 	"mime/multipart"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -24,16 +27,20 @@ const (
 // writer handles write traffic of pin application. Multiple writers form the service
 // component to handle the application's write operations
 type writer struct {
-	R      *hr.Router
-	PinDB  PinDB
-	UserDB UserDB
+	R       *hr.Router
+	PinDAO  PinDAO
+	UserDAO UserDAO
 }
 
-type PinDB interface {
+type PinDAO interface {
 	Create(p *md.Pin) *se.Err
 }
 
-type UserDB interface {
+type dummyPinDAO struct{}
+
+func (dao *dummyPinDAO) Create(p *md.Pin) *se.Err { return nil }
+
+type UserDAO interface {
 	Register(u *md.User) se.Err
 }
 
@@ -115,7 +122,7 @@ func (wrt *writer) HandleTaskCreatePin() hr.Handle {
 			}
 			resp(w, perr.StatusCode(), tmplCreatePin, View{Err: perr.Error()})
 		}
-		if err := wrt.PinDB.Create(&pin); err != nil {
+		if err := wrt.PinDAO.Create(&pin); err != nil {
 			resp(w, err.StatusCode(), tmplCreatePin, View{Err: perr.Error()})
 		}
 		resp(w, http.StatusOK, tmplCreatePin, nil)
@@ -187,7 +194,7 @@ func detectSpam(trap string) partProcessor {
 			log.Errorf("spam trap not found. Got unexpected form name %s", name)
 			return cerr
 		}
-		bufR := bufio.NewReader(part)
+		bufR := bufio.NewReader(&LimitReader{part, 1})
 		var sb strings.Builder
 		n, err := bufR.WriteTo(&sb)
 		if err != nil {
@@ -232,8 +239,95 @@ func parsePinFromForm(r *multipart.Reader) (*md.Pin, *se.Err) {
 }
 
 func parsePin(pin *md.Pin) partProcessor {
-	// TODO: implement. Pass data via parameter if we need anything from request handle level
-	return nil
+	type partProcCfg struct {
+		FormName   string                        // form field name to process
+		LimitBytes int64                         // form field value size limit in bytes
+		Process    func(string, *md.Pin) *se.Err // logic to parse and validate form field value
+	}
+	// generate logic to process individual non-file form field
+	gen := func(cfg partProcCfg) partProcessor {
+		return func(r *multipart.Reader) *se.Err {
+			part, err := r.NextPart()
+			if err != nil {
+				return se.NewBadInput("error reading form part").WithCause(err)
+			} else if part.FormName() != cfg.FormName {
+				return se.NewBadInput(fmt.Sprintf("failed to find form field name %s", cfg.FormName))
+			}
+			lr := &LimitReader{part, cfg.LimitBytes}
+			bytes, err := ioutil.ReadAll(lr)
+			if err != nil {
+				switch v := err.(type) {
+				case *se.Err:
+					return v
+				default:
+					return se.NewBadInput(fmt.Sprintf("failed to read value of form field %s", cfg.FormName)).WithCause(err)
+				}
+			}
+			if err := cfg.Process(string(bytes), pin); err != nil {
+				return err
+			}
+			return nil
+		}
+	}
+	return func(r *multipart.Reader) *se.Err {
+		if err := processParts(r,
+			gen(partProcCfg{
+				FormName:   "title",
+				LimitBytes: 1 << 8,
+				Process: func(s string, pin *md.Pin) *se.Err {
+					pin.Title = s
+					return nil
+				},
+			}),
+			gen(partProcCfg{
+				FormName:   "body",
+				LimitBytes: 1 << 18, // TODO: read from env var?
+				Process: func(s string, pin *md.Pin) *se.Err {
+					pin.Body = s
+					return nil
+				},
+			}),
+			gen(partProcCfg{
+				FormName:   "private",
+				LimitBytes: 5,
+				Process: func(s string, pin *md.Pin) *se.Err {
+					private, err := strconv.ParseBool(s)
+					if err != nil {
+						return se.NewBadInput("invalid access mode value").WithCause(err)
+					}
+					pin.AccessMode = md.AccessModePublic
+					if private {
+						pin.AccessMode = md.AccessModePrivate
+					}
+					return nil
+				},
+			}),
+			gen(partProcCfg{
+				FormName:   "read-once-only",
+				LimitBytes: 5,
+				Process: func(s string, pin *md.Pin) *se.Err {
+					readOnceOnly, err := strconv.ParseBool(s)
+					if err != nil {
+						return se.NewBadInput("invalid read-once-only value").WithCause(err)
+					}
+					pin.ReadAndBurn = false
+					if readOnceOnly {
+						pin.ReadAndBurn = true
+					}
+					return nil
+				},
+			}),
+			genFilesProc(r, pin), // TODO: processing files
+		); err != nil {
+			return err
+		}
+		return nil
+	}
+}
+
+// TODO: genFilesProc generates logic to process files in multipart form
+func genFilesProc(r *multipart.Reader, pin *md.Pin) partProcessor {
+	return func(r *multipart.Reader) *se.Err { return nil }
 }
 
 func resp(w http.ResponseWriter, statusCode int, tmpl *template.Template, data interface{}) {
@@ -272,3 +366,22 @@ func processParts(r *multipart.Reader, ps ...partProcessor) *se.Err {
 }
 
 type partProcessor func(*multipart.Reader) *se.Err
+
+// Similar to io.Reader, however throw app-specific error instead of EOF to facilitate the use of ioutil.ReadAll
+// io.LimitReader cannot tell whether we had hit the limit or not
+type LimitReader struct {
+	R io.Reader // underlying reader
+	N int64     // max bytes remaining
+}
+
+func (r *LimitReader) Read(p []byte) (n int, err error) {
+	if r.N <= 0 {
+		return 0, se.NewOversized()
+	}
+	if int64(len(p)) > r.N {
+		p = p[0:r.N]
+	}
+	n, err = r.R.Read(p)
+	r.N -= int64(n)
+	return
+}

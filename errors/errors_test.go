@@ -55,6 +55,14 @@ func TestErrorsStatusCode(t *testing.T) {
 			err:          NewBadInput("fake"),
 			expectedCode: http.StatusBadRequest,
 		},
+		{
+			err:          NewSpam(),
+			expectedCode: http.StatusForbidden,
+		},
+		{
+			err:          NewOversized(),
+			expectedCode: http.StatusBadRequest,
+		},
 	}
 	for _, c := range tcs {
 		code := c.err.StatusCode()

@@ -34,7 +34,7 @@ type Pin struct {
 	// otherwise we will see increasing amount of db updates just for changing a single field
 	// ViewCount    uint64
 	Title string
-	Note  string
+	Body  string
 	// Attachments stores mappings between attachment's url-encoded filename and
 	// its reference in file storage layer
 	Attachments map[string]string
