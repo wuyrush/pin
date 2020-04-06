@@ -2,74 +2,63 @@ package models
 
 import (
 	"time"
-
-	cst "wuyrush.io/pin/constants"
 )
 
-/*
- Application layer data models.
-*/
-
-type AccessMode int
+// AccessMode describes a pin's accessibility
+type AccessMode uint8
 
 const (
 	AccessModePublic AccessMode = iota
 	AccessModePrivate
 )
 
-var AccessModeVals = map[AccessMode]struct{}{
-	AccessModePublic:  {},
-	AccessModePrivate: {},
+var accessModes = [...]string{
+	"Public",
+	"Private",
 }
 
+func (m AccessMode) String() string {
+	return accessModes[uint8(m)]
+}
+
+// Pin models the information pinned by users
 type Pin struct {
 	ID           string
 	OwnerID      string
-	Mode         AccessMode
+	AccessMode   AccessMode
 	CreationTime time.Time
 	GoodFor      time.Duration
 	ReadAndBurn  bool
-	ViewCount    uint64
-	Title        string
-	Note         string
+	// 	a pin's view count need to be updated frequently as more and more user read the same pin
+	// so not a good idea to store it as part of the pin document if we use a document-based db
+	// otherwise we will see increasing amount of db updates just for changing a single field
+	// ViewCount    uint64
+	Title string
+	Note  string
 	// Attachments stores mappings between attachment's url-encoded filename and
 	// its reference in file storage layer
 	Attachments map[string]string
 }
 
 func (p *Pin) VisibleTo(u *User) bool {
-	// TODO: implement
+	if p.AccessMode == AccessModePublic {
+		return true
+	} else if !u.Anonymous() && u.ID == p.OwnerID {
+		return true
+	}
 	return false
 }
 
-// Checks if the pin info is expired or not. A pin info is expired if and only if
-// 1. The current server time is later than the pin info's expiry OR
-// 2. The pin info has ReadAndBurn marked as true and ViewCount >= 1
-// The application shall remove all expired pin info from cache to prevent any further access.
-func (p *Pin) Expired() bool {
-	return time.Now().After(p.CreationTime.Add(p.GoodFor)) || (p.ReadAndBurn && p.ViewCount >= 1)
-}
-
-// pinView vends necessary pin data for rendering web pages
-type PinView struct {
-	Pin
-	Expiry        time.Time
-	Err           string
-	URL           string
-	FilenameToURL map[string]string
-}
-
-// Junk represents necessary pin data for deletion purpose
-type Junk struct {
-	PinID    string   // pin ID
-	FileRefs []string // references of pin's attachments on storage layer
+// Stale tells if a pin should be removed or not.
+func (p *Pin) Stale() bool {
+	return p.CreationTime.Add(p.GoodFor).Before(time.Now())
 }
 
 // User models individual service user
 type User struct {
 	ID           string
-	IDType       cst.IDType
-	Passwd       string // only used during email / phone registration. Ignored in all other scenarios
+	IDType       IDType
+	Passwd       string // only used during registration
 	Hash         string
 	CreationTime time.Time
 	Active       bool
@@ -77,4 +66,21 @@ type User struct {
 
 func (u *User) Anonymous() bool {
 	return u == nil
+}
+
+// IDType represents user ID type
+type IDType uint8
+
+const (
+	IDTypeEmail IDType = iota
+	IDTypePhoneNumber
+)
+
+var idTypes = [...]string{
+	"Email",
+	"PhoneNumber",
+}
+
+func (t IDType) String() string {
+	return idTypes[uint8(t)]
 }
