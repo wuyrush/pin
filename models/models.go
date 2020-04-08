@@ -23,7 +23,7 @@ func (m AccessMode) String() string {
 
 // Pin models the information pinned by users
 type Pin struct {
-	ID           string
+	ID           string // ID is also a Pin's URI
 	OwnerID      string
 	AccessMode   AccessMode
 	CreationTime time.Time
