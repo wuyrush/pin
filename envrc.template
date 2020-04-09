@@ -1,0 +1,12 @@
+# env var for local development
+
+############## project setup ##############
+export PROJECT_ROOT=$(pwd)
+# So that we can use features like multiple .dockerignore files and secrets.
+# Build enhancement requires docker >= 19.03
+export DOCKER_BUILDKIT=1
+
+############## application services ##############
+export VERBOSE=true
+export PIN_WRITER_SERVER_ADDR=127.0.0.1:5000
+export PIN_TRAP_NAME=password1

@@ -21,7 +21,7 @@ const (
 
 func TestHandleTaskCreatePin(t *testing.T) {
 	type formView struct {
-		Title, Private, ReadOnlyOnce, Body, ExpireAfter string
+		Trap, Title, Private, ReadOnlyOnce, Body, ExpireAfter string
 	}
 	goodFormView := func() formView {
 		return formView{
@@ -48,9 +48,15 @@ func TestHandleTaskCreatePin(t *testing.T) {
 		//		{
 		//			name: "EmptyTitle",
 		//		},
-		//		{
-		//			name: "SpamAttempt",
-		//		},
+		{
+			name: "SpamAttempt",
+			reqBody: func() io.Reader {
+				v := goodFormView()
+				v.Trap = "y"
+				return genCreatePinReqBody(v)
+			}(),
+			expectedCode: http.StatusForbidden,
+		},
 		//		{
 		//			name: "OversizedTitle",
 		//		},
@@ -138,6 +144,7 @@ The preamble of multipart request body. This should be ignored.
 --test
 Content-Disposition: form-data; name="faketrap" 
 
+{{.Trap}}
 --test
 Content-Disposition: form-data; name="title" 
 
