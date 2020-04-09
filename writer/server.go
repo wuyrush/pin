@@ -82,6 +82,13 @@ func (wrt *writer) SetupRoutes() error {
 	// r.GET("/register", w.HandleAuthGetRegister)
 	// r.GET("/login", w.HandleAuthGetLogin)
 	// r.GET("/logout", w.HandleAuthLoggedout)
+
+	// static assets
+	// r.Handler(
+	// 	http.MethodGet,
+	// 	"/static/*filepath",
+	// 	http.StripPrefix("/static/", http.FileServer(http.Dir("static"))),
+	// )
 	wrt.R = r
 	return nil
 }

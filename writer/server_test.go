@@ -69,6 +69,9 @@ func TestHandleTaskCreatePin(t *testing.T) {
 		//		{
 		//			name: "InvalidExpiry",
 		//		},
+		//{
+		//	name: "PinDaoError",
+		//},
 	}
 	fakeTmpl, err := template.New("fakeTmpl").Parse(`
 		{{.Err}}	
@@ -80,7 +83,8 @@ func TestHandleTaskCreatePin(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			// given
 			mockPinDao := &MockPinDAO{}
-			wrec, r := httptest.NewRecorder(), httptest.NewRequest(http.MethodPost, "/create", nil)
+			mockPinDao.On("Create", mock.AnythingOfType("*models.Pin")).Return((*se.Err)(nil))
+			wrec, r := httptest.NewRecorder(), httptest.NewRequest(http.MethodPost, "/create", c.reqBody)
 			r.Header.Add("Content-Type", "multipart/form-data;boundary=\"test\"")
 			wrt := &writer{PinDAO: mockPinDao}
 			createPin := wrt.HandleTaskCreatePin(fakeTmpl, testTrapName)
