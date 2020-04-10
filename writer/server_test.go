@@ -21,15 +21,15 @@ const (
 
 func TestHandleTaskCreatePin(t *testing.T) {
 	type formView struct {
-		Trap, Title, Private, ReadOnlyOnce, Body, ExpireAfter string
+		Trap, Title, Private, ReadOnlyOnce, Body, GoodFor string
 	}
 	goodFormView := func() formView {
 		return formView{
 			Title:        "fakeTitle",
-			Private:      "false",
-			ReadOnlyOnce: "false",
+			Private:      "true",
+			ReadOnlyOnce: "true",
 			Body:         "fakeBody",
-			ExpireAfter:  "1h",
+			GoodFor:      "1h",
 		}
 	}
 	tcs := []struct {
@@ -57,24 +57,87 @@ func TestHandleTaskCreatePin(t *testing.T) {
 			}(),
 			expectedCode: http.StatusForbidden,
 		},
-		//		{
-		//			name: "OversizedTitle",
-		//		},
-		//		{
-		//			name: "OversizedBody",
-		//		},
-		//		{
-		//			name: "EmptyBody",
-		//		},
-		//		{
-		//			name: "InvalidAccessMode",
-		//		},
-		//		{
-		//			name: "InvalidReadOnlyOnce",
-		//		},
-		//		{
-		//			name: "InvalidExpiry",
-		//		},
+		{
+			name: "OversizedTitle",
+			reqBody: func() io.Reader {
+				v := goodFormView()
+				v.Title = strings.Repeat("omyverylongtitle", 1<<5) // 1<<9 bytes in total
+				return genCreatePinReqBody(v)
+			}(),
+			expectedCode: http.StatusBadRequest,
+		},
+		{
+			name: "EmptyTitle",
+			reqBody: func() io.Reader {
+				v := goodFormView()
+				v.Title = ""
+				return genCreatePinReqBody(v)
+			}(),
+			expectedCode: http.StatusOK,
+		},
+		{
+			name: "OversizedBody",
+			reqBody: func() io.Reader {
+				v := goodFormView()
+				v.Body = strings.Repeat("ohmyverylongbody", 1<<15) // 1<<19 bytes in total
+				return genCreatePinReqBody(v)
+			}(),
+			expectedCode: http.StatusBadRequest,
+		},
+		{
+			name: "EmptyBody",
+			reqBody: func() io.Reader {
+				v := goodFormView()
+				v.Body = ""
+				return genCreatePinReqBody(v)
+			}(),
+			expectedCode: http.StatusBadRequest,
+		},
+		{
+			name: "InvalidAccessMode",
+			reqBody: func() io.Reader {
+				v := goodFormView()
+				v.Private = "junk"
+				return genCreatePinReqBody(v)
+			}(),
+			expectedCode: http.StatusBadRequest,
+		},
+		{
+			name: "InvalidReadOnlyOnce",
+			reqBody: func() io.Reader {
+				v := goodFormView()
+				v.ReadOnlyOnce = "junk"
+				return genCreatePinReqBody(v)
+			}(),
+			expectedCode: http.StatusBadRequest,
+		},
+		{
+			name: "InvalidGoodFor",
+			reqBody: func() io.Reader {
+				v := goodFormView()
+				v.GoodFor = "junk"
+				return genCreatePinReqBody(v)
+			}(),
+			expectedCode: http.StatusBadRequest,
+		},
+		{
+			name: "GoodForTooShort",
+			reqBody: func() io.Reader {
+				v := goodFormView()
+				v.GoodFor = "30s"
+				return genCreatePinReqBody(v)
+			}(),
+			expectedCode: http.StatusBadRequest,
+		},
+		{
+			name: "GoodForTooLong",
+			reqBody: func() io.Reader {
+				v := goodFormView()
+				v.GoodFor = "2h"
+				return genCreatePinReqBody(v)
+			}(),
+			expectedCode: http.StatusBadRequest,
+		},
 		//{
 		//	name: "PinDaoError",
 		//},
@@ -98,7 +161,7 @@ func TestHandleTaskCreatePin(t *testing.T) {
 			createPin(wrec, r, nil)
 			// then
 			assert.Equal(t, c.expectedCode, wrec.Code, "unexpected response status code")
-			// TODO: more verification
+			// TODO: more verification on response data
 		})
 	}
 }
@@ -162,9 +225,9 @@ Content-Disposition: form-data; name="body"
 
 {{.Body}}
 --test
-Content-Disposition: form-data; name="expire-after" 
+Content-Disposition: form-data; name="good-for" 
 
-{{.ExpireAfter}}
+{{.GoodFor}}
 --test--
 The epilogue. This should be ignored
 		`))

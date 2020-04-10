@@ -295,6 +295,9 @@ func parsePin(pin *md.Pin) partProcessor {
 				FormName:   "title",
 				LimitBytes: 1 << 8,
 				Process: func(s string, pin *md.Pin) *se.Err {
+					if s == "" {
+						s = fmt.Sprintf("pin-%s", time.Now().Format(time.RFC3339))
+					}
 					pin.Title = s
 					return nil
 				},
@@ -333,7 +336,25 @@ func parsePin(pin *md.Pin) partProcessor {
 				FormName:   "body",
 				LimitBytes: 1 << 18, // TODO: read from env var?
 				Process: func(s string, pin *md.Pin) *se.Err {
+					if s == "" {
+						return se.NewBadInput("body cannot be empty")
+					}
 					pin.Body = s
+					return nil
+				},
+			}),
+			gen(partProcCfg{
+				FormName:   "good-for",
+				LimitBytes: 8, // time.Duration is int64 under the hood
+				Process: func(s string, pin *md.Pin) *se.Err {
+					d, err := time.ParseDuration(s)
+					if err != nil {
+						return se.NewBadInput("invalid time duration").WithCause(err)
+					}
+					if d < 1*time.Minute || d > 1*time.Hour {
+						return se.NewBadInput("time duration too short or too long")
+					}
+					pin.GoodFor = d
 					return nil
 				},
 			}),

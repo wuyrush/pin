@@ -8,7 +8,7 @@
 # Test binary, build with `go test -c`
 *.test
 
-# Output of the go coverage tool, specifically when used with LiteIDE
+# Output of the go coverage tool as per https://blog.golang.org/cover
 *.out
 
 # npm
@@ -19,7 +19,8 @@ node_modules
 
 # scripts and artifacts for dev testing
 .dev
-# direnv
+
+# project env var configuration
 .envrc
 
 # vim stuff
