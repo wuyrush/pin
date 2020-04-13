@@ -19,6 +19,30 @@ const (
 	testTrapName = "faketrap"
 )
 
+func TestHandleTaskGetCreatePinPage(t *testing.T) {
+	tcs := []struct {
+		name               string
+		expectedStatusCode int
+	}{
+		{
+			name:               "HappyCase",
+			expectedStatusCode: http.StatusOK,
+		},
+	}
+	fakeTmpl, err := template.New("fakeTmpl").Parse(`{{.Private}}`)
+	assert.Nil(t, err, "parsing fake template should have succeeded")
+	for _, c := range tcs {
+		t.Run(c.name, func(t *testing.T) {
+			wrec, r := httptest.NewRecorder(), httptest.NewRequest(http.MethodPost, "/create", nil)
+			wrt := &writer{}
+			getPage := wrt.HandleTaskGetCreatePinPage(fakeTmpl)
+			getPage(wrec, r, nil)
+
+			assert.Equal(t, c.expectedStatusCode, wrec.Code, "unexpected response status code")
+		})
+	}
+}
+
 func TestHandleTaskCreatePin(t *testing.T) {
 	type formView struct {
 		Trap, Title, Private, ReadOnlyOnce, Body, GoodFor string

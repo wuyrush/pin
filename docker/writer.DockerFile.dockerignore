@@ -2,12 +2,13 @@
 # https://github.com/moby/moby/issues/12886
 # https://stackoverflow.com/a/57774684
 
-**/*
+*
 # include go module related files
 !go.*
-# include all go sources
-!**/*.go
 
-# include all html templates and static assets
-!server/templates
-!server/static
+# include the source of service and 1st-party dependencies 
+!writer
+!common
+!email
+!errors
+!models

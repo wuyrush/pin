@@ -7,8 +7,12 @@ import (
 
 	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
-	"github.com/spf13/viper"
-	cst "wuyrush.io/pin/constants"
+)
+
+const (
+	envVerbose = "PIN_VERBOSE"
+
+	logFieldFuncName = "funcName"
 )
 
 // ServiceFormatter is a Formatter that:
@@ -28,7 +32,7 @@ func (f *ServiceFormatter) Format(e *log.Entry) ([]byte, error) {
 }
 
 // SetupLog setups service-specific logging.
-func SetupLog(name string) {
+func SetupLog(name string, verbose bool) {
 	log.SetOutput(os.Stdout)
 	// use unix timestamp instead of zonal one
 	f := &ServiceFormatter{
@@ -37,7 +41,7 @@ func SetupLog(name string) {
 	}
 	log.SetFormatter(f)
 	log.SetLevel(log.InfoLevel)
-	if viper.GetBool(cst.EnvVerbose) {
+	if verbose {
 		log.SetLevel(log.DebugLevel)
 	}
 }
@@ -52,5 +56,5 @@ func WithFuncName() *logrus.Entry {
 		fr, _ := frs.Next()
 		funcName = fr.Function
 	}
-	return log.WithField(cst.LogFieldFuncName, funcName)
+	return log.WithField(logFieldFuncName, funcName)
 }

@@ -1,0 +1,26 @@
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Pin it</title>
+</head>
+<body>
+  {{if .Err}}
+  <p class="pin-error">{{.Err}}</p>
+  {{end}}
+  <h3>Create A Pin</h3>
+	<form action="/pin" method="POST" name="pin-form" enctype="multipart/form-data">
+    {{/* honeypot field to detect bots */}}
+    <input type="text" name="password" value="" class="mine" autocomplete="off">
+    Title: <input type="text" name="title" value="{{.Title}}" autofocus> <br>
+		Private? <input type="checkbox" name="private" value="true"> <br>
+		Read only once? <input type="checkbox" name="read-only-once" value="true"> <br>
+		Note:<br>
+    <textarea name="body" rows="5" cols="50">{{.Body}}</textarea>
+		<br>
+		Good for <input type="text" name="good-for" value=""> <br>
+		Attachments:<br>
+		<input type="file" name="attachments" multiple><br><br>
+		<input type="submit" value="Create">
+	</form> 
+</body>
+</html>

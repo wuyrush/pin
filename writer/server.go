@@ -21,6 +21,7 @@ import (
 const (
 	envWriterServerAddr = "PIN_WRITER_SERVER_ADDR"
 	envTrapName         = "PIN_TRAP_NAME"
+	envWriterVerbose    = "PIN_WRITER_VERBOSE"
 )
 
 // writer handles write traffic of pin application. Multiple writers form the service
@@ -40,12 +41,13 @@ func serve() error {
 	if err != nil {
 		return err
 	}
+	// TODO: response to system signals and graceful shutdown: s.Shutdown(ctx) and s.RegisterOnShutdown(ctx)
 	return s.ListenAndServe()
 }
 
 func setup() (*http.Server, error) {
-	logging.SetupLog("pin-writer")
 	viper.AutomaticEnv()
+	logging.SetupLog("pin-writer", viper.GetBool(envWriterVerbose))
 	wrt := &writer{PinDAO: dummyPinDAO{}}
 	if err := wrt.SetupRoutes(); err != nil {
 		return nil, err
@@ -56,7 +58,7 @@ func setup() (*http.Server, error) {
 		// TODO: tweak setups
 		ReadTimeout:    10 * time.Second,
 		WriteTimeout:   10 * time.Second,
-		MaxHeaderBytes: 1 << 20,
+		MaxHeaderBytes: 1 << 10,
 	}, nil
 }
 
@@ -68,6 +70,7 @@ func (wrt *writer) SetupRoutes() error {
 		log.Error("error loading html template: create-pin")
 		return err
 	}
+	r.GET("/create", wrt.HandleTaskGetCreatePinPage(tmplCreatePin))
 	r.POST("/create", wrt.HandleTaskCreatePin(tmplCreatePin, trap))
 	r.PATCH("/access/:pid", wrt.HandleTaskChangePinAccessMode)
 	r.DELETE("/delete/:pid", wrt.HandleTaskDeletePin)
@@ -93,14 +96,13 @@ func (wrt *writer) SetupRoutes() error {
 	return nil
 }
 
-/*
-Alg:
-	1. Bot detection
-	2. Process(and validate) form input related to pin
-	3. Save pin data
-	4. Return response to client
+func (wrt *writer) HandleTaskGetCreatePinPage(tmpl *template.Template) hr.Handle {
+	return func(w http.ResponseWriter, r *http.Request, _ hr.Params) {
+		// TODO: present private option to registered users only
+		resp(w, 200, tmpl, nil)
+	}
+}
 
-*/
 func (wrt *writer) HandleTaskCreatePin(tmpl *template.Template, trap string) hr.Handle {
 	type View struct {
 		Err, URL, Title, Body string
