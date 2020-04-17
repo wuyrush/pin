@@ -14,6 +14,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"wuyrush.io/pin/common/logging"
+	mw "wuyrush.io/pin/common/middleware"
 	se "wuyrush.io/pin/errors"
 	md "wuyrush.io/pin/models"
 )
@@ -70,7 +71,7 @@ func (wrt *writer) SetupRoutes() error {
 		log.Error("error loading html template: create-pin")
 		return err
 	}
-	r.GET("/create", wrt.HandleTaskGetCreatePinPage(tmplCreatePin))
+	r.GET("/create", mw.Chain(wrt.HandleTaskGetCreatePinPage(tmplCreatePin), mw.PanicRecoverer()))
 	r.POST("/create", wrt.HandleTaskCreatePin(tmplCreatePin, trap))
 	r.PATCH("/access/:pid", wrt.HandleTaskChangePinAccessMode)
 	r.DELETE("/delete/:pid", wrt.HandleTaskDeletePin)
@@ -169,21 +170,6 @@ func resp(w http.ResponseWriter, statusCode int, tmpl *template.Template, data i
 	if err := tmpl.Execute(w, data); err != nil {
 		log.WithField("templateName", tmpl.Name()).WithError(err).Error("error executing response template")
 	}
-}
-
-// TODO: implement
-func PanicRecover(h hr.Handle) hr.Handle {
-	return h
-}
-
-// TODO: implement
-func RateLimiter(h hr.Handle, burst int, rate float64) hr.Handle {
-	return h
-}
-
-// TODO: implement
-func HSTSer(h hr.Handle) hr.Handle {
-	return h
 }
 
 type PinDAO interface {
