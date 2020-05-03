@@ -43,24 +43,28 @@ services:
             - '${PIN_READER_SERVER_PORT}'
         networks:
             - pin-network
-              #    redis:
-              #        image: redis:alpine
-              #        volumes:
-              #            # https://github.com/docker-library/redis/blob/b6d413ceff3a2bca10a430ace121597fa8fe2a2c/5.0/alpine/Dockerfile#L73
-              #            - pin-cache-data:/data
-              #        networks:
-              #            - pin-network
-              #        expose:
-              #            - "${REDIS_PORT}"
-              #        command:
-              #            # https://github.com/docker-library/redis/blob/b6d413ceff3a2bca10a430ace121597fa8fe2a2c/5.0/alpine/Dockerfile#L80
-              #            - redis-server
-              #            - "--requirepass ${REDIS_PASSWD}"
-              #            - "--port ${REDIS_PORT}"
-              #            - "--timeout ${REDIS_IDLE_CLIENT_TIMEOUT_SECONDS}"
-              #            - "--maxclients ${REDIS_MAX_CLIENTS}"
-              #            - "--maxmemory ${REDIS_MAXMEM_BYTES}"
-              #            - "--maxmemory-policy ${REDIS_MAXMEM_POLICY}"
+    pin-db:
+        image: couchdb:3
+        environment:
+            - COUCHDB_USER
+            - COUCHDB_PASSWORD
+        networks:
+            - pin-network
+    db-populator:
+        build:
+            context: ..
+            dockerfile: ./docker/db-populator.DockerFile
+        environment:
+            - COUCHDB_USER
+            - COUCHDB_PASSWORD
+            - COUCHDB_USER_APP
+            - COUCHDB_PASSWORD_APP
+            - DB_NAME_PIN
+            - DB_NAME_PIN_META
+            - DB_NAME_USER
+        depends_on:
+            - pin-db
+        networks:
+            - pin-network
 networks:
     pin-network:
-        #volumes:
