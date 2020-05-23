@@ -4,9 +4,6 @@ set -e
 
 # setup system database
 CURL_ADMIN="curl --silent --show-error -u ${COUCHDB_USER}:${COUCHDB_PASSWORD}"
-# TODO: given this is run in a one-off container, change this when setting up in production environment to avoid transmitting creds over plain-text http
-DB_ADDR="http://pin-db:5984"
-
 echo "Waiting for CouchDB to stand up"
 sleep 3
 
@@ -14,7 +11,7 @@ sleep 3
 # 1. db is up 
 # 2. application setup params are present
 echo "Checking if CouchDB is up"
-$CURL_ADMIN $DB_ADDR/_up | grep -q 'ok' 
+$CURL_ADMIN $COUCHDB_ADDR/_up | grep -q 'ok' 
 if [ $? -ne 0 ]; then
   echo "CouchDB is yet up" >&2
   exit 1
@@ -29,14 +26,14 @@ fi
 echo "Creating system databases"
 for dbname in "_users" "_replicator"
 do
-  $CURL_ADMIN -X PUT $DB_ADDR/$dbname
+  $CURL_ADMIN -X PUT $COUCHDB_ADDR/$dbname
 done
 
 # setup application user
 echo "Creating application user"
 
 DATA_PUT_USER="{\"name\": \"$COUCHDB_USER_APP\", \"password\": \"$COUCHDB_PASSWORD_APP\", \"roles\": [], \"type\": \"user\"}"
-$CURL_ADMIN -X PUT $DB_ADDR/_users/org.couchdb.user:${COUCHDB_USER_APP} \
+$CURL_ADMIN -X PUT $COUCHDB_ADDR/_users/org.couchdb.user:${COUCHDB_USER_APP} \
      -H "Accept: application/json" \
      -H "Content-Type: application/json" \
      -d "$DATA_PUT_USER"
@@ -47,6 +44,6 @@ echo "Creating application databases and populating application user's permissio
 SEC_DOC="{\"admins\": { \"names\": [], \"roles\": [] }, \"members\": { \"names\": [\"$COUCHDB_USER_APP\"], \"roles\": [] } }"
 for dbname in $DB_NAME_PIN $DB_NAME_PIN_META $DB_NAME_PIN_USER
 do
-  $CURL_ADMIN -X PUT $DB_ADDR/$dbname
-  $CURL_ADMIN -X PUT $DB_ADDR/$dbname/_security -H "Content-Type: application/json" -d "$SEC_DOC"
+  $CURL_ADMIN -X PUT $COUCHDB_ADDR/$dbname
+  $CURL_ADMIN -X PUT $COUCHDB_ADDR/$dbname/_security -H "Content-Type: application/json" -d "$SEC_DOC"
 done

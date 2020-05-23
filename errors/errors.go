@@ -1,7 +1,6 @@
 package errors
 
 import (
-	"errors"
 	"net/http"
 	"strings"
 )
@@ -28,22 +27,15 @@ type Err struct {
 }
 
 func (e *Err) Error() string {
-	return e.msg
-}
-
-// Trace returns the stacktrace associated with the error
-func (e *Err) Trace() string {
-	b := &strings.Builder{}
-	b.WriteString(e.msg)
-	err := errors.Unwrap(e)
-	indent := ""
-	for err != nil {
-		b.WriteString("\n")
-		indent += "\t"
-		b.WriteString(indent)
-		b.WriteString("Caused by: ")
-		b.WriteString(err.Error())
-		err = errors.Unwrap(err)
+	var b strings.Builder
+	b.WriteString(string(e.Code))
+	if e.msg != "" {
+		b.WriteString(": ")
+		b.WriteString(e.msg)
+	}
+	if e.cause != nil {
+		b.WriteString(" Caused by: ")
+		b.WriteString(e.cause.Error())
 	}
 	return b.String()
 }
@@ -108,6 +100,10 @@ func NewOversized() *Err {
 	return &Err{Code: ErrCodeOversized}
 }
 
+func NewDepFailure() *Err {
+	return &Err{Code: ErrCodeDependencyFailure}
+}
+
 // StatusCode returns the http response status code associated with the Err value
 func (e *Err) StatusCode() int {
 	switch e.Code {
@@ -120,4 +116,11 @@ func (e *Err) StatusCode() int {
 	default:
 		return http.StatusInternalServerError
 	}
+}
+
+// StrErr is syntax sugar to turn string to error
+type StrErr string
+
+func (e StrErr) Error() string {
+	return string(e)
 }

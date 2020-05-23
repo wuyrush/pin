@@ -81,3 +81,23 @@ func TestModels_UserAnonymous(t *testing.T) {
 		assert.Equal(t, c.anonymous, c.user.Anonymous(), "unexpected user anonymonity")
 	}
 }
+
+func TestUserIDTypeStringer(t *testing.T) {
+	tcs := []struct {
+		idType UserIDType
+		exp    string
+	}{
+		{
+			idType: UserIDType(255),
+			exp:    "InvalidUserIDType",
+		},
+		{
+			idType: UserIDTypeEmail,
+			exp:    "Email",
+		},
+	}
+	for _, c := range tcs {
+		actual := c.idType.String()
+		assert.Equal(t, c.exp, actual)
+	}
+}

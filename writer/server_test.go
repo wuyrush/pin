@@ -56,24 +56,29 @@ func TestHandleTaskCreatePin(t *testing.T) {
 			GoodFor:      "1h",
 		}
 	}
+	defaultMockPinStore := func() *MockPinStore {
+		m := &MockPinStore{}
+		m.On("Create", mock.Anything).Return((*se.Err)(nil))
+		return m
+	}
 	tcs := []struct {
 		name         string
+		mockPinStore *MockPinStore
 		reqBody      io.Reader
 		expectedCode int
 	}{
 		{
 			name:         "HappyCaseWithoutFiles",
+			mockPinStore: defaultMockPinStore(),
 			reqBody:      genCreatePinReqBody(goodFormView()),
 			expectedCode: http.StatusOK,
 		},
 		//		{
 		//			name: "HappyCaseWithFiles",
 		//		},
-		//		{
-		//			name: "EmptyTitle",
-		//		},
 		{
-			name: "SpamAttempt",
+			name:         "SpamAttempt",
+			mockPinStore: &MockPinStore{},
 			reqBody: func() io.Reader {
 				v := goodFormView()
 				v.Trap = "y"
@@ -82,7 +87,8 @@ func TestHandleTaskCreatePin(t *testing.T) {
 			expectedCode: http.StatusForbidden,
 		},
 		{
-			name: "OversizedTitle",
+			name:         "OversizedTitle",
+			mockPinStore: &MockPinStore{},
 			reqBody: func() io.Reader {
 				v := goodFormView()
 				v.Title = strings.Repeat("omyverylongtitle", 1<<5) // 1<<9 bytes in total
@@ -91,7 +97,8 @@ func TestHandleTaskCreatePin(t *testing.T) {
 			expectedCode: http.StatusBadRequest,
 		},
 		{
-			name: "EmptyTitle",
+			name:         "EmptyTitle",
+			mockPinStore: defaultMockPinStore(),
 			reqBody: func() io.Reader {
 				v := goodFormView()
 				v.Title = ""
@@ -100,7 +107,8 @@ func TestHandleTaskCreatePin(t *testing.T) {
 			expectedCode: http.StatusOK,
 		},
 		{
-			name: "OversizedBody",
+			name:         "OversizedBody",
+			mockPinStore: &MockPinStore{},
 			reqBody: func() io.Reader {
 				v := goodFormView()
 				v.Body = strings.Repeat("ohmyverylongbody", 1<<15) // 1<<19 bytes in total
@@ -109,7 +117,8 @@ func TestHandleTaskCreatePin(t *testing.T) {
 			expectedCode: http.StatusBadRequest,
 		},
 		{
-			name: "EmptyBody",
+			name:         "EmptyBody",
+			mockPinStore: &MockPinStore{},
 			reqBody: func() io.Reader {
 				v := goodFormView()
 				v.Body = ""
@@ -118,7 +127,8 @@ func TestHandleTaskCreatePin(t *testing.T) {
 			expectedCode: http.StatusBadRequest,
 		},
 		{
-			name: "InvalidAccessMode",
+			name:         "InvalidAccessMode",
+			mockPinStore: &MockPinStore{},
 			reqBody: func() io.Reader {
 				v := goodFormView()
 				v.Private = "junk"
@@ -127,7 +137,8 @@ func TestHandleTaskCreatePin(t *testing.T) {
 			expectedCode: http.StatusBadRequest,
 		},
 		{
-			name: "InvalidReadOnlyOnce",
+			name:         "InvalidReadOnlyOnce",
+			mockPinStore: &MockPinStore{},
 			reqBody: func() io.Reader {
 				v := goodFormView()
 				v.ReadOnlyOnce = "junk"
@@ -136,7 +147,8 @@ func TestHandleTaskCreatePin(t *testing.T) {
 			expectedCode: http.StatusBadRequest,
 		},
 		{
-			name: "InvalidGoodFor",
+			name:         "InvalidGoodFor",
+			mockPinStore: &MockPinStore{},
 			reqBody: func() io.Reader {
 				v := goodFormView()
 				v.GoodFor = "junk"
@@ -145,7 +157,8 @@ func TestHandleTaskCreatePin(t *testing.T) {
 			expectedCode: http.StatusBadRequest,
 		},
 		{
-			name: "GoodForTooShort",
+			name:         "GoodForTooShort",
+			mockPinStore: &MockPinStore{},
 			reqBody: func() io.Reader {
 				v := goodFormView()
 				v.GoodFor = "30s"
@@ -154,7 +167,8 @@ func TestHandleTaskCreatePin(t *testing.T) {
 			expectedCode: http.StatusBadRequest,
 		},
 		{
-			name: "GoodForTooLong",
+			name:         "GoodForTooLong",
+			mockPinStore: &MockPinStore{},
 			reqBody: func() io.Reader {
 				v := goodFormView()
 				v.GoodFor = "2h"
@@ -162,9 +176,16 @@ func TestHandleTaskCreatePin(t *testing.T) {
 			}(),
 			expectedCode: http.StatusBadRequest,
 		},
-		//{
-		//	name: "PinDaoError",
-		//},
+		{
+			name: "PinDaoError",
+			mockPinStore: func() *MockPinStore {
+				m := &MockPinStore{}
+				m.On("Create", mock.Anything).Return(se.NewDepFailure())
+				return m
+			}(),
+			reqBody:      genCreatePinReqBody(goodFormView()),
+			expectedCode: http.StatusInternalServerError,
+		},
 	}
 	fakeTmpl, err := template.New("fakeTmpl").Parse(`
 		{{.Err}}	
@@ -175,17 +196,15 @@ func TestHandleTaskCreatePin(t *testing.T) {
 	for _, c := range tcs {
 		t.Run(c.name, func(t *testing.T) {
 			// given
-			mockPinDao := &MockPinDAO{}
-			mockPinDao.On("Create", mock.AnythingOfType("*models.Pin")).Return((*se.Err)(nil))
 			wrec, r := httptest.NewRecorder(), httptest.NewRequest(http.MethodPost, "/create", c.reqBody)
 			r.Header.Add("Content-Type", "multipart/form-data;boundary=\"test\"")
-			wrt := &writer{PinDAO: mockPinDao}
+			wrt := &writer{PinStore: c.mockPinStore}
 			createPin := wrt.HandleTaskCreatePin(fakeTmpl, testTrapName)
 			// when
 			createPin(wrec, r, nil)
 			// then
 			assert.Equal(t, c.expectedCode, wrec.Code, "unexpected response status code")
-			// TODO: more verification on response data
+			c.mockPinStore.AssertExpectations(t)
 		})
 	}
 }
@@ -215,10 +234,14 @@ func TestHandleAuthUpdateUserProfile(t *testing.T) {
 }
 
 // mocks
-type MockPinDAO struct{ mock.Mock }
+type MockPinStore struct{ mock.Mock }
 
-func (m *MockPinDAO) Create(p *md.Pin) *se.Err {
+func (m *MockPinStore) Create(p *md.Pin) *se.Err {
 	return m.Called(p).Get(0).(*se.Err)
+}
+
+func (m *MockPinStore) Close() *se.Err {
+	return nil
 }
 
 // utils

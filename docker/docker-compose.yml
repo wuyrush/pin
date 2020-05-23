@@ -26,6 +26,12 @@ services:
             - PIN_WRITER_VERBOSE
             - PIN_WRITER_SERVER_ADDR
             - PIN_TRAP_NAME
+            - COUCHDB_ADDR
+            - COUCHDB_USER_APP
+            - COUCHDB_PASSWORD_APP
+            - DB_NAME_PIN
+            - DB_NAME_PIN_META
+            - DB_NAME_USER
         ports:
             - '${PIN_WRITER_SERVER_PORT}'
         networks:
@@ -55,6 +61,7 @@ services:
             context: ..
             dockerfile: ./docker/db-populator.DockerFile
         environment:
+            - COUCHDB_ADDR
             - COUCHDB_USER
             - COUCHDB_PASSWORD
             - COUCHDB_USER_APP

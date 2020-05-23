@@ -1,58 +1,109 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"html/template"
 	"io"
 	"io/ioutil"
 	"mime/multipart"
+	"net"
 	"net/http"
+	"os"
+	"os/signal"
 	"strconv"
+	"syscall"
 	"time"
 
 	hr "github.com/julienschmidt/httprouter"
+	"github.com/segmentio/ksuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"wuyrush.io/pin/common/logging"
 	mw "wuyrush.io/pin/common/middleware"
 	se "wuyrush.io/pin/errors"
 	md "wuyrush.io/pin/models"
+	st "wuyrush.io/pin/store"
 )
 
 const (
-	envWriterServerAddr = "PIN_WRITER_SERVER_ADDR"
-	envTrapName         = "PIN_TRAP_NAME"
-	envWriterVerbose    = "PIN_WRITER_VERBOSE"
+	envWriterServerAddr  = "PIN_WRITER_SERVER_ADDR"
+	envTrapName          = "PIN_TRAP_NAME"
+	envWriterVerbose     = "PIN_WRITER_VERBOSE"
+	envCouchDBAddr       = "COUCHDB_ADDR"
+	envCouchDBUsername   = "COUCHDB_USER_APP"
+	envCouchDBPasswd     = "COUCHDB_PASSWORD_APP"
+	envPinDBName         = "DB_NAME_PIN"
+	envPinMetadataDBName = "DB_NAME_PIN_META"
+	envUserDBName        = "DB_NAME_USER"
 )
 
 // writer handles write traffic of pin application. Multiple writers form the service
 // component to handle the application's write operations
 type writer struct {
-	R       *hr.Router
-	PinDAO  PinDAO
-	UserDAO UserDAO
+	R         *hr.Router
+	PinStore  st.PinStore
+	UserStore st.UserStore
 }
 
 func (wrt *writer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	wrt.R.ServeHTTP(w, r)
 }
 
-func serve() error {
+func serve() {
 	s, err := setup()
 	if err != nil {
-		return err
+		log.WithError(err).Fatal("error setting up http server")
 	}
-	// TODO: response to system signals and graceful shutdown: s.Shutdown(ctx) and s.RegisterOnShutdown(ctx)
-	return s.ListenAndServe()
+	idleConnsClosed := make(chan struct{})
+	go func() {
+		sigs := make(chan os.Signal, 2)
+		signal.Notify(sigs, os.Interrupt, syscall.SIGTERM)
+		<-sigs
+
+		if err := s.Shutdown(context.Background()); err != nil {
+			log.WithError(err).Error("error shutting down http server")
+		}
+		close(idleConnsClosed)
+	}()
+	if err := s.ListenAndServe(); err != http.ErrServerClosed {
+		// Error starting / closing listener
+		log.WithError(err).Fatal("error starting or closing http server")
+	}
+	// wait for shutdown process to finish
+	<-idleConnsClosed
 }
 
 func setup() (*http.Server, error) {
 	viper.AutomaticEnv()
 	logging.SetupLog("pin-writer", viper.GetBool(envWriterVerbose))
-	wrt := &writer{PinDAO: dummyPinDAO{}}
+	// setup clients to dependencies
+	pinStore := st.NewCouchPinStore(&st.CouchConfig{
+		DBAddr:            viper.GetString(envCouchDBAddr),
+		DBUsername:        viper.GetString(envCouchDBUsername),
+		DBPasswd:          viper.GetString(envCouchDBPasswd),
+		PinDBName:         viper.GetString(envPinDBName),
+		PinMetadataDBName: viper.GetString(envPinMetadataDBName),
+		RT: &http.Transport{
+			DialContext: (&net.Dialer{
+				Timeout:   5 * time.Second,
+				KeepAlive: 30 * time.Second,
+			}).DialContext,
+			MaxIdleConns:          50,
+			IdleConnTimeout:       60 * time.Second,
+			TLSHandshakeTimeout:   10 * time.Second,
+			ExpectContinueTimeout: 1 * time.Second,
+		},
+		RequestTimeout: time.Second * 30,
+	})
+	defer pinStore.Close()
+	wrt := &writer{
+		PinStore: pinStore,
+	}
 	if err := wrt.SetupRoutes(); err != nil {
 		return nil, err
 	}
+	// TODO: register shutdown hook with http.Server.RegisterOnShutdown to clean up things like DB conn
 	return &http.Server{
 		Addr:    viper.GetString(envWriterServerAddr),
 		Handler: wrt,
@@ -115,10 +166,12 @@ func (wrt *writer) HandleTaskCreatePin(tmpl *template.Template, trap string) hr.
 			resp(w, http.StatusBadRequest, tmpl, View{Err: "error reading form data"})
 			return
 		}
-		var pin md.Pin
+		pin := &md.Pin{
+			CreationTime: time.Now().UTC(),
+		}
 		perr := processParts(reader,
 			detectSpam(trap),
-			parsePin(&pin),
+			parsePin(pin),
 		)
 		if perr != nil {
 			switch perr.Code {
@@ -130,12 +183,29 @@ func (wrt *writer) HandleTaskCreatePin(tmpl *template.Template, trap string) hr.
 			resp(w, perr.StatusCode(), tmpl, View{Err: perr.Error()})
 			return
 		}
-		if err := wrt.PinDAO.Create(&pin); err != nil {
-			resp(w, err.StatusCode(), tmpl, View{Err: perr.Error()})
+		if err := genID(pin); err != nil {
+			msg := "error generating pin ID"
+			log.WithError(err).Error(msg)
+			resp(w, http.StatusInternalServerError, tmpl, View{Err: msg})
+		}
+		if err := wrt.PinStore.Create(pin); err != nil {
+			resp(w, err.StatusCode(), tmpl, View{Err: err.Error()})
 			return
 		}
 		resp(w, http.StatusOK, tmpl, nil)
 	}
+}
+
+func genID(p *md.Pin) error {
+	// generate pin ID. Makes ID k-sortable by expiration time so that we avoid building an extra index
+	// for pin removal. This function assumes p already has valid expiry
+	expiry := p.CreationTime.Add(p.GoodFor)
+	id, err := ksuid.NewRandomWithTime(expiry)
+	if err != nil {
+		return err
+	}
+	p.ID = id.String()
+	return nil
 }
 
 func (wrt *writer) HandleTaskChangePinAccessMode(w http.ResponseWriter, r *http.Request, p hr.Params) {

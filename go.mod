@@ -4,10 +4,13 @@ go 1.13
 
 require (
 	github.com/gin-gonic/gin v1.6.2
+	github.com/go-kivik/couchdb/v3 v3.1.0
+	github.com/go-kivik/kivik/v3 v3.1.2
 	github.com/gopherjs/gopherjs v0.0.0-20200209144316-f9cef593def5 // indirect
 	github.com/julienschmidt/httprouter v1.2.0
 	github.com/konsorten/go-windows-terminal-sequences v1.0.2 // indirect
 	github.com/magiconair/properties v1.8.1
+	github.com/segmentio/ksuid v1.0.2
 	github.com/sirupsen/logrus v1.5.0
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/spf13/viper v1.6.2

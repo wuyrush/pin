@@ -1,42 +1,12 @@
 package errors
 
 import (
+	"errors"
 	"net/http"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
-
-func TestErrorsTrace(t *testing.T) {
-	tcs := []struct {
-		name     string
-		err      *Err
-		expected string
-	}{
-		{
-			name:     "ErrWithoutCause",
-			err:      NewNotImplemented(),
-			expected: "Not implemented",
-		},
-		{
-			name: "ErrWithCauses",
-			err: &Err{
-				msg: "foo",
-				cause: &Err{
-					msg:   "bar",
-					cause: &Err{msg: "qux"},
-				},
-			},
-			expected: "foo\n\tCaused by: bar\n\t\tCaused by: qux",
-		},
-	}
-	for _, c := range tcs {
-		t.Run(c.name, func(t *testing.T) {
-			actual := c.err.Trace()
-			assert.Equal(t, c.expected, actual, "unexpected error trace")
-		})
-	}
-}
 
 func TestErrorsStatusCode(t *testing.T) {
 	tcs := []struct {
@@ -67,5 +37,29 @@ func TestErrorsStatusCode(t *testing.T) {
 	for _, c := range tcs {
 		code := c.err.StatusCode()
 		assert.Equal(t, c.expectedCode, code, "unexpected status code")
+	}
+}
+
+func TestErrorsStringer(t *testing.T) {
+	tcs := []struct {
+		err *Err
+		exp string
+	}{
+		{
+			err: NewServiceFailure("boom").WithCause(errors.New("fake")),
+			exp: "ServiceFailure: boom Caused by: fake",
+		},
+		{
+			err: NewServiceFailure("boom"),
+			exp: "ServiceFailure: boom",
+		},
+		{
+			err: NewSpam(),
+			exp: "SpamDetected",
+		},
+	}
+	for _, c := range tcs {
+		actual := c.err.Error()
+		assert.Equal(t, c.exp, actual)
 	}
 }
